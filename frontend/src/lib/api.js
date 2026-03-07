@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://itms-api.riski-labs.site'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 export async function login(email = 'owner@acme.com') {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
