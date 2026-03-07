@@ -85,7 +85,11 @@ nav { display: flex; flex-direction: column; gap: 6px; }
 }
 .nav-item.ghost { opacity: .82; cursor: default; }
 
-.content { padding: 16px 20px 22px; }
+.content {
+  padding: 16px 20px 22px;
+  width: 100%;
+  min-width: 0;
+}
 
 .topbar {
   height: 54px;
@@ -138,7 +142,11 @@ nav { display: flex; flex-direction: column; gap: 6px; }
   padding: 4px 8px;
 }
 
-.page-wrap { max-width: 1220px; padding-top: 16px; }
+.page-wrap {
+  width: 100%;
+  max-width: none;
+  padding-top: 16px;
+}
 
 .page-title { margin: 0; font-size: 34px; color: #111827; }
 .muted { color: #64748b; }
