@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export async function login(email = 'owner@acme.com') {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
@@ -34,6 +34,21 @@ export async function onboardTenant(payload) {
   if (!res.ok) {
     const error = await res.json().catch(() => ({}))
     throw new Error(error?.error?.message || 'Onboarding failed')
+  }
+
+  return res.json()
+}
+
+export async function registerTenant(payload) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/register-tenant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.error?.message || 'Registration failed')
   }
 
   return res.json()

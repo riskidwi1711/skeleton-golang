@@ -6,7 +6,7 @@ import { clearToken } from './lib/auth'
 const route = useRoute()
 const router = useRouter()
 
-const isAuthPage = computed(() => route.path === '/login')
+const isAuthPage = computed(() => ['/login', '/signup'].includes(route.path))
 
 function logout() {
   clearToken()

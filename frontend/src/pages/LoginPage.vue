@@ -43,6 +43,11 @@ async function submit() {
 
         <button class="btn" :disabled="loading">{{ loading ? 'Signing in...' : 'Sign In' }}</button>
         <p v-if="error" class="danger-text">{{ error }}</p>
+
+        <p class="muted" style="margin:0; font-size:12px;">
+          Belum punya tenant?
+          <RouterLink to="/signup" style="color:#0f6cbd; font-weight:600;">Daftar sekarang</RouterLink>
+        </p>
       </form>
     </div>
   </div>

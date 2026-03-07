@@ -4,11 +4,13 @@ import TicketsPage from './pages/TicketsPage.vue'
 import AssetsPage from './pages/AssetsPage.vue'
 import OnboardingPage from './pages/OnboardingPage.vue'
 import LoginPage from './pages/LoginPage.vue'
+import SignupPage from './pages/SignupPage.vue'
 import { isAuthed } from './lib/auth'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', component: LoginPage, meta: { public: true } },
+  { path: '/signup', component: SignupPage, meta: { public: true } },
   { path: '/dashboard', component: DashboardPage },
   { path: '/tickets', component: TicketsPage },
   { path: '/assets', component: AssetsPage },
