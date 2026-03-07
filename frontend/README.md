@@ -1,9 +1,31 @@
-# Frontend (Placeholder)
+# ITMS Frontend
 
-Recommended stack: Vue 3 + Vite + Tailwind + Pinia.
+Vue 3 + Vite admin UI starter untuk ITMS.
 
-Planned responsibilities:
-- Auth flows (login, logout)
-- Tenant onboarding form
-- Ticketing and asset dashboards
-- Role-based menus and module visibility
+## Current pages
+- `/dashboard` (tenant summary dari API)
+- `/tickets` (UI draft)
+- `/assets` (UI draft)
+- `/onboarding` (form onboarding tenant)
+
+## Run local
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Build
+```bash
+npm run build
+npm run preview
+```
+
+## API target
+Default API base:
+- `https://itms-api.riski-labs.site`
+
+Override via `.env`:
+```bash
+VITE_API_BASE=https://itms-api.riski-labs.site
+```
