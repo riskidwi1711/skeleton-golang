@@ -19,7 +19,7 @@
 
       <nav>
         <RouterLink to="/dashboard" class="nav-item">Dashboard</RouterLink>
-        <RouterLink to="/tickets" class="nav-item">Service Desk</RouterLink>
+        <RouterLink to="/tickets" class="nav-item">Katalog Layanan</RouterLink>
         <RouterLink to="/assets" class="nav-item">Manajemen Aset</RouterLink>
         <RouterLink to="/onboarding" class="nav-item">Tenant Onboarding</RouterLink>
       </nav>

@@ -233,6 +233,93 @@ nav { display: flex; flex-direction: column; gap: 6px; }
   gap: 10px;
 }
 
+.service-filter label {
+  display: grid;
+  gap: 6px;
+  color: #9fb1d8;
+  font-size: 13px;
+}
+
+.filter-buttons {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.service-card {
+  border: 1px solid #264486;
+  border-radius: 12px;
+  background: #131f3d;
+  overflow: hidden;
+}
+
+.service-head {
+  background: linear-gradient(120deg, #2269ff, #2e82ff);
+  padding: 12px;
+}
+
+.service-head h4 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.service-cat {
+  color: #dce7ff;
+  font-size: 13px;
+}
+
+.service-body {
+  padding: 12px;
+}
+
+.service-body p {
+  color: #b9c7e9;
+  margin-top: 0;
+}
+
+.service-meta {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.service-meta div {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed #2f4d86;
+  padding-bottom: 6px;
+}
+
+.service-meta span {
+  color: #9bb0da;
+  font-size: 13px;
+}
+
+.service-meta strong {
+  color: #dbe7ff;
+  font-size: 13px;
+}
+
+.service-req {
+  margin: 12px 0 0;
+  color: #8ea5d8;
+  font-size: 13px;
+}
+
+.service-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid #2a4378;
+}
+
 input, select {
   width: 100%;
   background: #1f2d50;
@@ -254,7 +341,18 @@ input, select {
 .btn.secondary { background: #32405b; }
 .btn.success { background: #17b767; }
 .btn.warning { background: #d39a22; }
+.btn.purple { background: #8f43ff; }
 .btn:disabled { opacity: .6; }
+
+.btn.tiny {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.btn.danger-solid {
+  background: #d44;
+}
 
 .table { width: 100%; border-collapse: collapse; }
 th, td {
@@ -293,6 +391,7 @@ label { display: grid; gap: 8px; font-size: 14px; }
   .sidebar { border-right: 0; border-bottom: 1px solid #1f2f57; }
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid-2 { grid-template-columns: 1fr; }
-  .filters-grid, .form-grid { grid-template-columns: 1fr; }
+  .filters-grid, .form-grid, .service-grid { grid-template-columns: 1fr; }
+  .filter-buttons { align-items: stretch; }
   .page-row { flex-direction: column; }
 }
