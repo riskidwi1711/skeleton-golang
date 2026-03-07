@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { login, listTenants } from '../lib/api'
+import { listTenants } from '../lib/api'
+import { getToken } from '../lib/auth'
 
 const loading = ref(true)
 const error = ref('')
@@ -9,7 +10,7 @@ const now = ref(new Date())
 
 onMounted(async () => {
   try {
-    const token = await login()
+    const token = getToken()
     tenants.value = await listTenants(token)
   } catch (e) {
     error.value = e.message

@@ -1,5 +1,23 @@
+<script setup>
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { clearToken } from './lib/auth'
+
+const route = useRoute()
+const router = useRouter()
+
+const isAuthPage = computed(() => route.path === '/login')
+
+function logout() {
+  clearToken()
+  router.push('/login')
+}
+</script>
+
 <template>
-  <div class="app-shell">
+  <RouterView v-if="isAuthPage" />
+
+  <div v-else class="app-shell">
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-icon">IT</div>
@@ -47,6 +65,7 @@
             <div class="avatar small">R</div>
             <span>Riski</span>
           </div>
+          <button class="btn secondary tiny" @click="logout">Logout</button>
         </div>
       </header>
 
