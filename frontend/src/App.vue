@@ -8,26 +8,44 @@ const router = useRouter()
 const isAuthPage = computed(() => ['/login', '/signup'].includes(route.path))
 
 const userMenuOpen = ref(false)
-const userMenuRef = ref(null)
+const notifOpen = ref(false)
+const menuWrapRef = ref(null)
+const notifWrapRef = ref(null)
+
+const notifications = ref([
+  { title: 'Ticket baru #INC-1029', desc: 'Priority tinggi - cabang Jakarta', time: '2m ago' },
+  { title: 'Asset warranty akan habis', desc: '5 perangkat bulan ini', time: '15m ago' },
+  { title: 'Tenant signup baru', desc: 'PT Maju Digital', time: '1h ago' },
+])
+
+const unreadCount = computed(() => notifications.value.length)
+const pageTitle = computed(() => route.meta?.title || 'Dashboard')
+const breadcrumb = computed(() => `ITMS / ${pageTitle.value}`)
 
 function toggleUserMenu() {
   userMenuOpen.value = !userMenuOpen.value
+  if (userMenuOpen.value) notifOpen.value = false
 }
 
-function closeUserMenu() {
+function toggleNotif() {
+  notifOpen.value = !notifOpen.value
+  if (notifOpen.value) userMenuOpen.value = false
+}
+
+function closeMenus() {
   userMenuOpen.value = false
+  notifOpen.value = false
 }
 
 function onDocClick(e) {
-  if (!userMenuRef.value) return
-  if (!userMenuRef.value.contains(e.target)) {
-    closeUserMenu()
-  }
+  const insideUser = menuWrapRef.value?.contains(e.target)
+  const insideNotif = notifWrapRef.value?.contains(e.target)
+  if (!insideUser && !insideNotif) closeMenus()
 }
 
 function logout() {
   clearToken()
-  closeUserMenu()
+  closeMenus()
   router.push('/login')
 }
 
@@ -79,24 +97,44 @@ onBeforeUnmount(() => {
           <button class="icon-btn" aria-label="Menu">
             <svg viewBox="0 0 24 24" class="icon-svg"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
           </button>
+
+          <div>
+            <p class="breadcrumb">{{ breadcrumb }}</p>
+            <h4 class="page-caption">{{ pageTitle }}</h4>
+          </div>
+
           <div class="searchbox">
             <svg viewBox="0 0 24 24" class="icon-svg muted-icon"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-            <input placeholder="Search..." />
+            <input placeholder="Search menu, ticket, asset..." />
           </div>
         </div>
 
         <div class="top-right">
-          <button class="icon-btn" aria-label="Theme">
-            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
-          </button>
-          <button class="icon-btn" aria-label="Settings">
-            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8 4a8.9 8.9 0 00-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 00-1.7-1L15.5 2h-4l-.3 2.1a8 8 0 00-1.7 1l-2.4-1-2 3.4 2 1.5a8.9 8.9 0 000 2l-2 1.5 2 3.4 2.4-1a8 8 0 001.7 1l.3 2.1h4l.3-2.1a8 8 0 001.7-1l2.4 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
-          </button>
-          <button class="icon-btn" aria-label="Notifications">
-            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M18 16V11a6 6 0 10-12 0v5l-2 2h16l-2-2zm-8 4a2 2 0 004 0"/></svg>
-          </button>
+          <div class="command-bar">
+            <button class="btn tiny">New</button>
+            <button class="btn secondary tiny">Export</button>
+            <button class="btn secondary tiny">Refresh</button>
+          </div>
 
-          <div class="user-menu-wrap" ref="userMenuRef">
+          <div class="notif-wrap" ref="notifWrapRef">
+            <button class="icon-btn" aria-label="Notifications" @click.stop="toggleNotif">
+              <svg viewBox="0 0 24 24" class="icon-svg"><path d="M18 16V11a6 6 0 10-12 0v5l-2 2h16l-2-2zm-8 4a2 2 0 004 0"/></svg>
+              <span class="badge-dot" v-if="unreadCount">{{ unreadCount }}</span>
+            </button>
+
+            <div class="notif-dropdown" v-if="notifOpen">
+              <p class="notif-title">Notifications</p>
+              <div class="notif-item" v-for="n in notifications" :key="n.title + n.time">
+                <strong>{{ n.title }}</strong>
+                <span>{{ n.desc }}</span>
+                <em>{{ n.time }}</em>
+              </div>
+            </div>
+          </div>
+
+          <div class="context-chip">Tenant: Demo • Role: Owner</div>
+
+          <div class="user-menu-wrap" ref="menuWrapRef">
             <button class="profile-chip" @click.stop="toggleUserMenu">
               <div class="avatar small">R</div>
               <span>Riski</span>

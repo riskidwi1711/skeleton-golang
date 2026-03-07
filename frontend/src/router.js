@@ -9,12 +9,12 @@ import { isAuthed } from './lib/auth'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
-  { path: '/login', component: LoginPage, meta: { public: true } },
-  { path: '/signup', component: SignupPage, meta: { public: true } },
-  { path: '/dashboard', component: DashboardPage },
-  { path: '/tickets', component: TicketsPage },
-  { path: '/assets', component: AssetsPage },
-  { path: '/onboarding', component: OnboardingPage },
+  { path: '/login', component: LoginPage, meta: { public: true, title: 'Login' } },
+  { path: '/signup', component: SignupPage, meta: { public: true, title: 'Sign Up' } },
+  { path: '/dashboard', component: DashboardPage, meta: { title: 'Dashboard' } },
+  { path: '/tickets', component: TicketsPage, meta: { title: 'Service Desk' } },
+  { path: '/assets', component: AssetsPage, meta: { title: 'Manajemen Aset' } },
+  { path: '/onboarding', component: OnboardingPage, meta: { title: 'Tenant Onboarding' } },
 ]
 
 const router = createRouter({
