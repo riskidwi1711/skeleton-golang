@@ -35,12 +35,11 @@ const services = [
     <div class="page-row">
       <div>
         <h3 class="page-title">Katalog Layanan</h3>
-        <p class="muted">Kelola layanan yang tersedia dalam sistem.</p>
+        <p class="muted">Kelola layanan Service Desk yang tersedia untuk tenant.</p>
       </div>
       <div class="actions">
-        <button class="btn success">Daftar Permintaan</button>
-        <button class="btn purple">Buat Permintaan</button>
-        <button class="btn">+ Tambah Layanan</button>
+        <button class="btn secondary">Daftar Permintaan</button>
+        <button class="btn">Buat Permintaan</button>
       </div>
     </div>
 
@@ -63,8 +62,8 @@ const services = [
           </select>
         </label>
         <div class="filter-buttons">
-          <button class="btn">Cari</button>
           <button class="btn secondary">Reset</button>
+          <button class="btn">Cari</button>
         </div>
       </div>
     </div>
@@ -73,26 +72,26 @@ const services = [
       <article class="service-card" v-for="item in services" :key="item.title">
         <div class="service-head">
           <h4>{{ item.title }}</h4>
-          <span class="service-cat">🏷 {{ item.category }}</span>
+          <span class="service-cat">{{ item.category }}</span>
         </div>
 
         <div class="service-body">
           <p>{{ item.description }}</p>
 
           <div class="service-meta">
-            <div><span>💵 Harga</span><strong>{{ item.price }}</strong></div>
-            <div><span>⏱ SLA Response</span><strong>{{ item.response }}</strong></div>
-            <div><span>🧪 SLA Resolusi</span><strong>{{ item.resolution }}</strong></div>
-            <div><span>🟢 Status</span><strong class="ok">Aktif</strong></div>
+            <div><span>Harga</span><strong>{{ item.price }}</strong></div>
+            <div><span>SLA Response</span><strong>{{ item.response }}</strong></div>
+            <div><span>SLA Resolusi</span><strong>{{ item.resolution }}</strong></div>
+            <div><span>Status</span><strong class="ok">Aktif</strong></div>
           </div>
 
-          <p class="service-req">📋 {{ item.requests }}</p>
+          <p class="service-req">{{ item.requests }}</p>
         </div>
 
         <div class="service-actions">
-          <button class="btn tiny">Lihat</button>
-          <button class="btn tiny success">Request</button>
-          <button class="btn tiny warning">Edit</button>
+          <button class="btn tiny secondary">Lihat</button>
+          <button class="btn tiny">Request</button>
+          <button class="btn tiny secondary">Edit</button>
           <button class="btn tiny danger-solid">Hapus</button>
         </div>
       </article>

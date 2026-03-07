@@ -1,14 +1,20 @@
+<script setup>
+const rows = [
+  { code: 'HRW-01-01', name: 'Laptop Lenovo', category: 'Laptop', status: 'Active', serial: '482149', division: 'Infrastruktur IT' },
+  { code: 'HRW-01-02', name: 'PC Asus ROG', category: 'Desktop', status: 'Active', serial: '92323', division: 'Manajemen Aset' },
+]
+</script>
+
 <template>
   <div>
     <div class="page-row">
       <div>
         <h3 class="page-title">Inventaris Hardware</h3>
-        <p class="muted">Kelola perangkat hardware perusahaan Anda.</p>
+        <p class="muted">Kelola perangkat hardware perusahaan Anda secara terstruktur.</p>
       </div>
       <div class="actions">
-        <button class="btn success">Export Excel</button>
-        <button class="btn warning">Import</button>
-        <button class="btn">+ Tambah Hardware</button>
+        <button class="btn secondary">Import CSV</button>
+        <button class="btn">Tambah Hardware</button>
       </div>
     </div>
 
@@ -35,23 +41,20 @@
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>HRW-01-01</td>
-            <td>Laptop Lenovo</td>
-            <td>Laptop</td>
-            <td><span class="pill green">Active</span></td>
-            <td>482149</td>
-            <td>Infrastruktur IT</td>
-            <td>👁️ ✏️ 🗑️</td>
-          </tr>
-          <tr>
-            <td>HRW-01-02</td>
-            <td>PC Asus ROG</td>
-            <td>PC</td>
-            <td><span class="pill green">Active</span></td>
-            <td>92323</td>
-            <td>Manajemen Aset</td>
-            <td>👁️ ✏️ 🗑️</td>
+          <tr v-for="row in rows" :key="row.code">
+            <td>{{ row.code }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.category }}</td>
+            <td><span class="pill green">{{ row.status }}</span></td>
+            <td>{{ row.serial }}</td>
+            <td>{{ row.division }}</td>
+            <td>
+              <div class="table-actions">
+                <button class="btn tiny secondary">Detail</button>
+                <button class="btn tiny secondary">Edit</button>
+                <button class="btn tiny danger-solid">Hapus</button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>

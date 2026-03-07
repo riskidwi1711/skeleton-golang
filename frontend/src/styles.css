@@ -563,6 +563,11 @@ input, select {
 }
 
 .table { width: 100%; border-collapse: collapse; }
+.table-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 th, td {
   text-align: left;
   padding: 11px 10px;
@@ -590,6 +595,45 @@ th { color: #64748b; font-weight: 600; }
   gap: 12px;
 }
 label { display: grid; gap: 8px; font-size: 14px; }
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.check-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.check-list li {
+  border: 1px solid #e6edf7;
+  background: #f8fbff;
+  border-radius: 10px;
+  padding: 10px;
+  color: #334155;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.check-list li span {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f6cbd;
+  background: #e8f1fb;
+  border: 1px solid #cde1f7;
+}
 
 .ok { color: #107c10; margin: 0; }
 .danger, .danger-text { color: #a4262c; margin: 0; }

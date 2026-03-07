@@ -22,6 +22,35 @@ const unreadCount = computed(() => notifications.value.length)
 const pageTitle = computed(() => route.meta?.title || 'Dashboard')
 const breadcrumb = computed(() => `ITMS / ${pageTitle.value}`)
 
+const topbarActionMap = {
+  '/dashboard': [
+    { label: 'Refresh', variant: 'secondary' },
+    { label: 'Export Summary', variant: 'primary' },
+  ],
+  '/tickets': [
+    { label: 'New Ticket', variant: 'primary' },
+    { label: 'Filter', variant: 'secondary' },
+    { label: 'Export Tickets', variant: 'secondary' },
+  ],
+  '/assets': [
+    { label: 'Add Asset', variant: 'primary' },
+    { label: 'Import CSV', variant: 'secondary' },
+    { label: 'Export Assets', variant: 'secondary' },
+  ],
+  '/onboarding': [
+    { label: 'Create Tenant', variant: 'primary' },
+    { label: 'View Logs', variant: 'secondary' },
+  ],
+}
+
+const pageActions = computed(() => topbarActionMap[route.path] || [])
+
+function handleTopbarAction(actionLabel) {
+  if (route.path === '/tickets' && actionLabel === 'New Ticket') return router.push('/tickets')
+  if (route.path === '/assets' && actionLabel === 'Add Asset') return router.push('/assets')
+  if (route.path === '/onboarding' && actionLabel === 'Create Tenant') return router.push('/onboarding')
+}
+
 function toggleUserMenu() {
   userMenuOpen.value = !userMenuOpen.value
   if (userMenuOpen.value) notifOpen.value = false
@@ -110,10 +139,16 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="top-right">
-          <div class="command-bar">
-            <button class="btn tiny">New</button>
-            <button class="btn secondary tiny">Export</button>
-            <button class="btn secondary tiny">Refresh</button>
+          <div class="command-bar" v-if="pageActions.length">
+            <button
+              v-for="action in pageActions"
+              :key="action.label"
+              class="btn tiny"
+              :class="action.variant === 'secondary' ? 'secondary' : ''"
+              @click="handleTopbarAction(action.label)"
+            >
+              {{ action.label }}
+            </button>
           </div>
 
           <div class="notif-wrap" ref="notifWrapRef">
