@@ -1,17 +1,43 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { clearToken } from './lib/auth'
 
 const route = useRoute()
 const router = useRouter()
-
 const isAuthPage = computed(() => ['/login', '/signup'].includes(route.path))
+
+const userMenuOpen = ref(false)
+const userMenuRef = ref(null)
+
+function toggleUserMenu() {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+function closeUserMenu() {
+  userMenuOpen.value = false
+}
+
+function onDocClick(e) {
+  if (!userMenuRef.value) return
+  if (!userMenuRef.value.contains(e.target)) {
+    closeUserMenu()
+  }
+}
 
 function logout() {
   clearToken()
+  closeUserMenu()
   router.push('/login')
 }
+
+onMounted(() => {
+  document.addEventListener('click', onDocClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocClick)
+})
 </script>
 
 <template>
@@ -69,11 +95,21 @@ function logout() {
           <button class="icon-btn" aria-label="Notifications">
             <svg viewBox="0 0 24 24" class="icon-svg"><path d="M18 16V11a6 6 0 10-12 0v5l-2 2h16l-2-2zm-8 4a2 2 0 004 0"/></svg>
           </button>
-          <div class="profile-chip">
-            <div class="avatar small">R</div>
-            <span>Riski</span>
+
+          <div class="user-menu-wrap" ref="userMenuRef">
+            <button class="profile-chip" @click.stop="toggleUserMenu">
+              <div class="avatar small">R</div>
+              <span>Riski</span>
+              <svg viewBox="0 0 24 24" class="icon-svg tiny-chevron"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <div class="user-dropdown" v-if="userMenuOpen">
+              <button class="dropdown-item" @click="logout">
+                <svg viewBox="0 0 24 24" class="icon-svg"><path d="M10 17l-5-5 5-5M5 12h14M14 7v-2h5v14h-5v-2"/></svg>
+                Logout
+              </button>
+            </div>
           </div>
-          <button class="btn secondary tiny" @click="logout">Logout</button>
         </div>
       </header>
 
