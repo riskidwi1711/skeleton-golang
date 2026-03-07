@@ -1,34 +1,15 @@
-compile:
-	echo "Compiling for every OS and Platform"
-	go env -w GOPRIVATE=gitlab.com/gobang
-	go mod tidy
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/app
+.PHONY: up down logs test-onboard
 
-startpostgre:
-	ssh -L 5432:127.0.0.1:5432 dev@202.150.161.130 -o port=2202
-
-build:
-	docker build . -t skeleton:1.0.0
-
-run:
-	docker run -d -p 3000:3000 --add-host=host.docker.internal:host-gateway --name skeleton skeleton:1.0.0
-
-stop:
-	docker kill skeleton
-
-up: build run
+up:
+	cd deploy && docker compose up -d
 
 down:
-	docker stop skeleton
-	docker rm skeleton
-	docker rmi skeleton:1.0.0
+	cd deploy && docker compose down
 
 logs:
-	docker logs skeleton
+	cd deploy && docker compose logs -f --tail=200
 
-localrun:
-	go run main.go -count=1
-
-runclear:
-	clear
-	go run main.go -count=1
+test-onboard:
+	curl -sS -X POST http://localhost/api/v1/tenants/onboard \
+	-H 'Content-Type: application/json' \
+	-d '{"company_name":"Acme Corp","admin_email":"owner@acme.com","plan":"starter"}' | jq

@@ -1,37 +1,30 @@
-# Skeleton Go Application
+# ITMS SaaS (Microservice Foundation)
 
-## Description
+Foundation setup for a multi-tenant IT Management SaaS.
 
-[ETB](https://etb.co.id) Skeleton Go Application
+## Structure
+- `services/gateway`
+- `services/auth-service`
+- `services/tenant-service`
+- `frontend/`
+- `deploy/docker-compose.yml`
+- `docs/`
 
-## Installation
-
+## Quick Start
 ```bash
-$ go mod tidy
+cd deploy
+docker compose up -d
 ```
 
-## Running the app
+## Gateway Endpoints
+- `GET /health`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/tenants/onboard`
+- `GET /api/v1/tenants`
 
+## Onboard Example
 ```bash
-# development
-$ go run main.go
-
-# watch mode (using nodemon)
-$ nodemon --exec go run main.go --signal SIGTERM
-
-# production mode
-$ ./bin/app
+curl -X POST http://localhost/api/v1/tenants/onboard \
+  -H 'Content-Type: application/json' \
+  -d '{"company_name":"Acme Corp","admin_email":"owner@acme.com","plan":"starter"}'
 ```
-
-## Test
-
-```bash
-# unit tests
-$ go test ./...
-```
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-- ETB Development Team - https://etb.co.id

@@ -1,0 +1,81 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --api.insecure=true
+    ports:
+      - "80:80"
+      - "8088:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  gateway:
+    image: golang:1.22-alpine
+    working_dir: /app
+    command: sh -c "go run ./cmd/main.go"
+    volumes:
+      - ../services/gateway:/app
+    environment:
+      - PORT=8080
+      - AUTH_SERVICE_URL=http://auth-service:8081
+      - TENANT_SERVICE_URL=http://tenant-service:8082
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gateway.rule=PathPrefix(`/`)
+      - traefik.http.routers.gateway.entrypoints=web
+      - traefik.http.services.gateway.loadbalancer.server.port=8080
+
+  auth-service:
+    image: golang:1.22-alpine
+    working_dir: /app
+    command: sh -c "go run ./cmd/main.go"
+    volumes:
+      - ../services/auth-service:/app
+    environment:
+      - PORT=8081
+
+  tenant-service:
+    image: golang:1.22-alpine
+    working_dir: /app
+    command: sh -c "go run ./cmd/main.go"
+    volumes:
+      - ../services/tenant-service:/app
+    environment:
+      - PORT=8082
+
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=itms
+      - POSTGRES_PASSWORD=itms
+      - POSTGRES_DB=auth_db
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+
+  postgres-core:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=itms
+      - POSTGRES_PASSWORD=itms
+      - POSTGRES_DB=core_db
+    volumes:
+      - postgres_core_data:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+
+  nats:
+    image: nats:2-alpine
+
+volumes:
+  postgres_auth_data:
+  postgres_core_data:
+  mongo_data:
