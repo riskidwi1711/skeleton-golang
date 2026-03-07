@@ -50,17 +50,25 @@ function logout() {
     <main class="content">
       <header class="topbar">
         <div class="top-left">
-          <button class="icon-btn">☰</button>
+          <button class="icon-btn" aria-label="Menu">
+            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
           <div class="searchbox">
-            <span>🔎</span>
+            <svg viewBox="0 0 24 24" class="icon-svg muted-icon"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
             <input placeholder="Search..." />
           </div>
         </div>
 
         <div class="top-right">
-          <button class="icon-btn">☾</button>
-          <button class="icon-btn">⚙️</button>
-          <button class="icon-btn">🔔</button>
+          <button class="icon-btn" aria-label="Theme">
+            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Settings">
+            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8 4a8.9 8.9 0 00-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 00-1.7-1L15.5 2h-4l-.3 2.1a8 8 0 00-1.7 1l-2.4-1-2 3.4 2 1.5a8.9 8.9 0 000 2l-2 1.5 2 3.4 2.4-1a8 8 0 001.7 1l.3 2.1h4l.3-2.1a8 8 0 001.7-1l2.4 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" class="icon-svg"><path d="M18 16V11a6 6 0 10-12 0v5l-2 2h16l-2-2zm-8 4a2 2 0 004 0"/></svg>
+          </button>
           <div class="profile-chip">
             <div class="avatar small">R</div>
             <span>Riski</span>

@@ -32,7 +32,7 @@ const timeText = computed(() =>
     <div class="hero-row">
       <div>
         <h3 class="page-title">Selamat Datang, Riski!</h3>
-        <p class="muted">🗓 {{ dateText }} &nbsp;&nbsp;•&nbsp;&nbsp; 🕒 {{ timeText }}</p>
+        <p class="muted"><span class="meta-chip">Date</span> {{ dateText }} &nbsp;&nbsp;•&nbsp;&nbsp; <span class="meta-chip">Time</span> {{ timeText }}</p>
       </div>
       <div class="muted right-note">Admin<br />Head Office Jakarta</div>
     </div>
@@ -48,7 +48,7 @@ const timeText = computed(() =>
             <h4>{{ Math.max(tenants.length * 2, 6) }}</h4>
             <small>↑ +86.7% this week</small>
           </div>
-          <div class="stat-icon">👥</div>
+          <div class="stat-icon">US</div>
         </div>
         <div class="stat-card green">
           <div>
@@ -56,7 +56,7 @@ const timeText = computed(() =>
             <h4>38</h4>
             <small>8 active</small>
           </div>
-          <div class="stat-icon">🏢</div>
+          <div class="stat-icon">BR</div>
         </div>
         <div class="stat-card purple">
           <div>
@@ -64,7 +64,7 @@ const timeText = computed(() =>
             <h4>48</h4>
             <small>Across all branches</small>
           </div>
-          <div class="stat-icon">👨‍💼</div>
+          <div class="stat-icon">DV</div>
         </div>
         <div class="stat-card orange">
           <div>
@@ -72,7 +72,7 @@ const timeText = computed(() =>
             <h4>3</h4>
             <small>Permission groups</small>
           </div>
-          <div class="stat-icon">🛡️</div>
+          <div class="stat-icon">RL</div>
         </div>
       </div>
 
