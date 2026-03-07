@@ -10,6 +10,7 @@ import (
 type Config struct {
 	AuthServiceURL   string
 	TenantServiceURL string
+	JWTSecret        string
 }
 
 func NewServer(cfg Config) http.Handler {
@@ -17,6 +18,7 @@ func NewServer(cfg Config) http.Handler {
 
 	authProxy := mustProxy(cfg.AuthServiceURL)
 	tenantProxy := mustProxy(cfg.TenantServiceURL)
+	jwtGuard := requireJWT(cfg.JWTSecret)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -27,9 +29,17 @@ func NewServer(cfg Config) http.Handler {
 		authProxy.ServeHTTP(w, r)
 	}))
 
-	mux.HandleFunc("/api/v1/tenants/", withRequestID(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/tenants/onboard", withRequestID(func(w http.ResponseWriter, r *http.Request) {
 		tenantProxy.ServeHTTP(w, r)
 	}))
+
+	mux.HandleFunc("/api/v1/tenants", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		tenantProxy.ServeHTTP(w, r)
+	})))
+
+	mux.HandleFunc("/api/v1/tenants/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		tenantProxy.ServeHTTP(w, r)
+	})))
 
 	return mux
 }

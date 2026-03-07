@@ -3,9 +3,20 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-func NewServer() http.Handler {
+type Config struct {
+	JWTSecret string
+}
+
+type loginRequest struct {
+	Email string `json:"email"`
+}
+
+func NewServer(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -17,8 +28,27 @@ func NewServer() http.Handler {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 			return
 		}
+
+		var req loginRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"sub":       "u-1",
+			"tenant_id": "tnt_demo",
+			"role":      "owner",
+			"email":     req.Email,
+			"exp":       time.Now().Add(24 * time.Hour).Unix(),
+			"iat":       time.Now().Unix(),
+		})
+
+		signed, err := token.SignedString([]byte(cfg.JWTSecret))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "token_sign_failed")
+			return
+		}
+
 		writeJSON(w, http.StatusOK, map[string]any{
-			"token": "dev-token",
+			"token": signed,
 			"user":  map[string]any{"id": "u-1", "role": "owner"},
 		})
 	})

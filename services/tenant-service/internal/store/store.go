@@ -1,7 +1,7 @@
 package store
 
 import (
-	"sync"
+	"context"
 	"time"
 )
 
@@ -14,29 +14,6 @@ type Tenant struct {
 }
 
 type Store interface {
-	SaveTenant(tenant Tenant)
-	ListTenant() []Tenant
-}
-
-type MemoryStore struct {
-	mu      sync.RWMutex
-	tenants []Tenant
-}
-
-func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{}
-}
-
-func (m *MemoryStore) SaveTenant(tenant Tenant) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.tenants = append(m.tenants, tenant)
-}
-
-func (m *MemoryStore) ListTenant() []Tenant {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	out := make([]Tenant, len(m.tenants))
-	copy(out, m.tenants)
-	return out
+	SaveTenant(ctx context.Context, tenant Tenant) (Tenant, error)
+	ListTenant(ctx context.Context) ([]Tenant, error)
 }

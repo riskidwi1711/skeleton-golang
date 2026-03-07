@@ -10,7 +10,8 @@ import (
 
 func main() {
 	port := getenv("PORT", "8081")
-	h := apphttp.NewServer()
+	cfg := apphttp.Config{JWTSecret: getenv("JWT_SECRET", "dev-secret")}
+	h := apphttp.NewServer(cfg)
 	log.Printf("auth-service listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, h); err != nil {
 		log.Fatal(err)

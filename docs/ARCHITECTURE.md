@@ -13,8 +13,8 @@
 
 ## Request Flow
 1. FE -> Gateway (`/api/v1/...`)
-2. Gateway injects request-id + proxies to service
-3. Service handles business logic and emits events (next phase)
+2. Gateway injects request-id, validates JWT for protected routes, then proxies to service
+3. Tenant service persists onboarding data and publishes `tenant.onboarded` event to NATS
 
 ## Data Split (Hybrid)
 - PostgreSQL: tenant, auth, roles/permissions, asset master

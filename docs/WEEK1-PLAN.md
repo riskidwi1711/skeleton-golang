@@ -8,7 +8,7 @@
 - [x] Docker Compose with Traefik + Redis + NATS + Postgres + Mongo
 
 ## Next coding tasks
-1. Replace tenant in-memory store with PostgreSQL repository
-2. Add JWT validation in gateway middleware
-3. Add RBAC model in auth-service
-4. Add event publish `tenant.onboarded` to NATS
+1. Implement real auth + user/tenant repository in auth-service (replace mock user)
+2. Add RBAC authorization rules in gateway (role checks per endpoint)
+3. Add NATS consumers for onboarding downstream actions (welcome email, provisioning)
+4. Add integration tests for login -> onboard -> list flow
