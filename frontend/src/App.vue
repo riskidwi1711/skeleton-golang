@@ -13,15 +13,19 @@
         <div class="avatar">R</div>
         <div>
           <strong>Riski</strong>
-          <p>Super Admin</p>
+          <p>Admin</p>
         </div>
       </div>
 
       <nav>
-        <RouterLink to="/dashboard" class="nav-item">Dashboard</RouterLink>
-        <RouterLink to="/tickets" class="nav-item">Katalog Layanan</RouterLink>
-        <RouterLink to="/assets" class="nav-item">Manajemen Aset</RouterLink>
-        <RouterLink to="/onboarding" class="nav-item">Tenant Onboarding</RouterLink>
+        <RouterLink to="/dashboard" class="nav-item">Dashboard <span>▾</span></RouterLink>
+        <RouterLink to="/tickets" class="nav-item">Service Desk <span>▾</span></RouterLink>
+        <RouterLink to="/assets" class="nav-item">Manajemen Aset <span>▾</span></RouterLink>
+        <a class="nav-item ghost">Manajemen Pengguna & Akses <span>▾</span></a>
+        <a class="nav-item ghost">Manajemen Cabang <span>▾</span></a>
+        <a class="nav-item ghost">Manajemen Permission <span>▾</span></a>
+        <a class="nav-item ghost">Pengumuman <span>▾</span></a>
+        <RouterLink to="/onboarding" class="nav-item">Tenant Onboarding <span>▾</span></RouterLink>
       </nav>
     </aside>
 
@@ -36,6 +40,7 @@
         </div>
 
         <div class="top-right">
+          <button class="icon-btn">☾</button>
           <button class="icon-btn">⚙️</button>
           <button class="icon-btn">🔔</button>
           <div class="profile-chip">
