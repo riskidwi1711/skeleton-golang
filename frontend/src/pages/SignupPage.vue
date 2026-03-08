@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { registerTenant } from '../lib/api'
-import { setToken } from '../lib/auth'
+import { setSession } from '../lib/auth'
 
 const router = useRouter()
 const form = ref({
@@ -21,7 +21,7 @@ async function submit() {
   error.value = ''
   try {
     const result = await registerTenant(form.value)
-    setToken(result.token)
+    setSession(result)
     router.push('/dashboard')
   } catch (e) {
     error.value = e.message || 'Registration failed'

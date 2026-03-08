@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { login } from '../lib/api'
-import { setToken } from '../lib/auth'
+import { setSession } from '../lib/auth'
 
 const router = useRouter()
 const email = ref('owner@acme.com')
@@ -13,8 +13,8 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
-    const token = await login(email.value)
-    setToken(token)
+    const session = await login(email.value)
+    setSession(session)
     router.push('/dashboard')
   } catch (e) {
     error.value = e.message || 'Login failed'

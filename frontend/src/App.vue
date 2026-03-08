@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { clearToken } from './lib/auth'
+import { clearToken, getUser, hasPermission } from './lib/auth'
 
 const route = useRoute()
 const router = useRouter()
 const isAuthPage = computed(() => ['/login', '/signup'].includes(route.path))
+const me = computed(() => getUser() || { name: 'User', role: 'viewer', tenant_id: 'tnt_demo' })
 
 const userMenuOpen = ref(false)
 const notifOpen = ref(false)
@@ -40,6 +41,10 @@ const topbarActionMap = {
   '/onboarding': [
     { label: 'Create Tenant', variant: 'primary' },
     { label: 'View Logs', variant: 'secondary' },
+  ],
+  '/access': [
+    { label: 'Invite User', variant: 'primary' },
+    { label: 'Review Roles', variant: 'secondary' },
   ],
 }
 
@@ -101,22 +106,19 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="user-mini">
-        <div class="avatar">R</div>
+        <div class="avatar">{{ (me.name || 'U').slice(0,1).toUpperCase() }}</div>
         <div>
-          <strong>Riski</strong>
-          <p>Admin</p>
+          <strong>{{ me.name }}</strong>
+          <p>{{ me.role }}</p>
         </div>
       </div>
 
       <nav>
         <RouterLink to="/dashboard" class="nav-item">Dashboard <span>▾</span></RouterLink>
         <RouterLink to="/tickets" class="nav-item">Service Desk <span>▾</span></RouterLink>
-        <RouterLink to="/assets" class="nav-item">Manajemen Aset <span>▾</span></RouterLink>
-        <a class="nav-item ghost">Manajemen Pengguna & Akses <span>▾</span></a>
-        <a class="nav-item ghost">Manajemen Cabang <span>▾</span></a>
-        <a class="nav-item ghost">Manajemen Permission <span>▾</span></a>
-        <a class="nav-item ghost">Pengumuman <span>▾</span></a>
-        <RouterLink to="/onboarding" class="nav-item">Tenant Onboarding <span>▾</span></RouterLink>
+        <RouterLink to="/assets" class="nav-item">Asset Management <span>▾</span></RouterLink>
+        <RouterLink v-if="hasPermission('users:read')" to="/access" class="nav-item">Users & Access <span>▾</span></RouterLink>
+        <RouterLink v-if="hasPermission('tenants:read')" to="/onboarding" class="nav-item">Tenant Onboarding <span>▾</span></RouterLink>
       </nav>
     </aside>
 
@@ -167,12 +169,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="context-chip">Tenant: Demo • Role: Owner</div>
+          <div class="context-chip">Tenant: {{ me.tenant_id || 'tnt_demo' }} • Role: {{ me.role }}</div>
 
           <div class="user-menu-wrap" ref="menuWrapRef">
             <button class="profile-chip" @click.stop="toggleUserMenu">
-              <div class="avatar small">R</div>
-              <span>Riski</span>
+              <div class="avatar small">{{ (me.name || 'U').slice(0,1).toUpperCase() }}</div>
+              <span>{{ me.name }}</span>
               <svg viewBox="0 0 24 24" class="icon-svg tiny-chevron"><path d="M6 9l6 6 6-6"/></svg>
             </button>
 

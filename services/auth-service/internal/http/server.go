@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,6 +30,16 @@ type registerTenantRequest struct {
 	Plan        string `json:"plan"`
 }
 
+type createUserRequest struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+type updateUserRoleRequest struct {
+	Role string `json:"role"`
+}
+
 type tenantResponse struct {
 	Data struct {
 		Tenant struct {
@@ -39,8 +51,153 @@ type tenantResponse struct {
 	} `json:"data"`
 }
 
+type appUser struct {
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Email    string    `json:"email"`
+	Role     string    `json:"role"`
+	TenantID string    `json:"tenant_id"`
+	Created  time.Time `json:"created_at"`
+}
+
+type roleDefinition struct {
+	Name        string   `json:"name"`
+	Label       string   `json:"label"`
+	Permissions []string `json:"permissions"`
+}
+
+type customClaims struct {
+	TenantID    string   `json:"tenant_id"`
+	Role        string   `json:"role"`
+	Email       string   `json:"email"`
+	Permissions []string `json:"permissions"`
+	jwt.RegisteredClaims
+}
+
+var rolePermissions = map[string][]string{
+	"owner": {
+		"dashboard:read", "tickets:read", "tickets:write", "assets:read", "assets:write", "users:read", "users:write", "tenants:read",
+	},
+	"admin": {
+		"dashboard:read", "tickets:read", "tickets:write", "assets:read", "assets:write", "users:read", "tenants:read",
+	},
+	"agent": {
+		"dashboard:read", "tickets:read", "tickets:write", "assets:read",
+	},
+	"viewer": {
+		"dashboard:read", "tickets:read", "assets:read",
+	},
+}
+
+type userStore struct {
+	mu    sync.RWMutex
+	items map[string]map[string]appUser // tenantID -> email -> user
+}
+
+func newUserStore() *userStore {
+	now := time.Now()
+	return &userStore{items: map[string]map[string]appUser{
+		"tnt_demo": {
+			"owner@acme.com": {
+				ID: "u-1", Name: "Owner Demo", Email: "owner@acme.com", Role: "owner", TenantID: "tnt_demo", Created: now,
+			},
+			"admin@acme.com": {
+				ID: "u-2", Name: "Admin Demo", Email: "admin@acme.com", Role: "admin", TenantID: "tnt_demo", Created: now,
+			},
+			"agent@acme.com": {
+				ID: "u-3", Name: "Agent Demo", Email: "agent@acme.com", Role: "agent", TenantID: "tnt_demo", Created: now,
+			},
+			"viewer@acme.com": {
+				ID: "u-4", Name: "Viewer Demo", Email: "viewer@acme.com", Role: "viewer", TenantID: "tnt_demo", Created: now,
+			},
+		},
+	}}
+}
+
+func (s *userStore) getOrCreateUser(email, tenantID string) appUser {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.items[tenantID] == nil {
+		s.items[tenantID] = map[string]appUser{}
+	}
+	if u, ok := s.items[tenantID][email]; ok {
+		return u
+	}
+	role := inferRoleFromEmail(email)
+	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: nameFromEmail(email), Email: email, Role: role, TenantID: tenantID, Created: time.Now()}
+	s.items[tenantID][email] = u
+	return u
+}
+
+func (s *userStore) listUsers(tenantID string) []appUser {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	users := make([]appUser, 0, len(s.items[tenantID]))
+	for _, u := range s.items[tenantID] {
+		users = append(users, u)
+	}
+	sort.Slice(users, func(i, j int) bool { return users[i].Created.After(users[j].Created) })
+	return users
+}
+
+func (s *userStore) createUser(tenantID, actorRole string, req createUserRequest) (appUser, error) {
+	if actorRole != "owner" && actorRole != "admin" {
+		return appUser{}, fmt.Errorf("forbidden")
+	}
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	req.Name = strings.TrimSpace(req.Name)
+	req.Role = strings.TrimSpace(strings.ToLower(req.Role))
+	if req.Email == "" || req.Name == "" || req.Role == "" {
+		return appUser{}, fmt.Errorf("name, email, role are required")
+	}
+	if _, ok := rolePermissions[req.Role]; !ok {
+		return appUser{}, fmt.Errorf("invalid role")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.items[tenantID] == nil {
+		s.items[tenantID] = map[string]appUser{}
+	}
+	if _, exists := s.items[tenantID][req.Email]; exists {
+		return appUser{}, fmt.Errorf("email already exists")
+	}
+	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: req.Name, Email: req.Email, Role: req.Role, TenantID: tenantID, Created: time.Now()}
+	s.items[tenantID][req.Email] = u
+	return u, nil
+}
+
+func (s *userStore) upsertUser(u appUser) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.items[u.TenantID] == nil {
+		s.items[u.TenantID] = map[string]appUser{}
+	}
+	s.items[u.TenantID][u.Email] = u
+}
+
+func (s *userStore) updateRole(tenantID, actorRole, userID, role string) (appUser, error) {
+	if actorRole != "owner" {
+		return appUser{}, fmt.Errorf("forbidden")
+	}
+	role = strings.TrimSpace(strings.ToLower(role))
+	if _, ok := rolePermissions[role]; !ok {
+		return appUser{}, fmt.Errorf("invalid role")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for email, u := range s.items[tenantID] {
+		if u.ID == userID {
+			u.Role = role
+			s.items[tenantID][email] = u
+			return u, nil
+		}
+	}
+	return appUser{}, fmt.Errorf("user not found")
+}
+
 func NewServer(cfg Config) http.Handler {
 	mux := http.NewServeMux()
+	users := newUserStore()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -54,8 +211,12 @@ func NewServer(cfg Config) http.Handler {
 
 		var req loginRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
-
-		token, err := signToken(cfg.JWTSecret, "u-1", "tnt_demo", "owner", req.Email)
+		req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+		if req.Email == "" {
+			req.Email = "owner@acme.com"
+		}
+		u := users.getOrCreateUser(req.Email, "tnt_demo")
+		token, err := signToken(cfg.JWTSecret, u)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "token_sign_failed", "failed to sign token")
 			return
@@ -63,7 +224,7 @@ func NewServer(cfg Config) http.Handler {
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"token": token,
-			"user":  map[string]any{"id": "u-1", "role": "owner", "email": req.Email},
+			"user":  map[string]any{"id": u.ID, "role": u.Role, "email": u.Email, "name": u.Name, "permissions": rolePermissions[u.Role]},
 		})
 	})
 
@@ -81,7 +242,7 @@ func NewServer(cfg Config) http.Handler {
 
 		req.CompanyName = strings.TrimSpace(req.CompanyName)
 		req.FullName = strings.TrimSpace(req.FullName)
-		req.Email = strings.TrimSpace(req.Email)
+		req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 		req.Plan = strings.TrimSpace(req.Plan)
 
 		if req.CompanyName == "" || req.FullName == "" || req.Email == "" || req.Password == "" {
@@ -122,7 +283,12 @@ func NewServer(cfg Config) http.Handler {
 			tenantID = "tnt_demo"
 		}
 
-		token, err := signToken(cfg.JWTSecret, "u-owner", tenantID, "owner", req.Email)
+		u := users.getOrCreateUser(req.Email, tenantID)
+		u.Role = "owner"
+		u.Name = req.FullName
+		users.upsertUser(u)
+
+		token, err := signToken(cfg.JWTSecret, u)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "token_sign_failed", "failed to sign token")
 			return
@@ -131,28 +297,149 @@ func NewServer(cfg Config) http.Handler {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"token": token,
 			"user": map[string]any{
-				"id":    "u-owner",
-				"name":  req.FullName,
-				"email": req.Email,
-				"role":  "owner",
+				"id":    u.ID,
+				"name":  u.Name,
+				"email": u.Email,
+				"role":  u.Role,
 			},
 			"tenant": tr.Data.Tenant,
 		})
 	})
 
+	mux.HandleFunc("/api/v1/roles", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+			return
+		}
+		roles := make([]roleDefinition, 0, len(rolePermissions))
+		for name, perms := range rolePermissions {
+			roles = append(roles, roleDefinition{Name: name, Label: strings.Title(name), Permissions: perms})
+		}
+		sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"items": roles}})
+	})
+
+	mux.HandleFunc("/api/v1/users", func(w http.ResponseWriter, r *http.Request) {
+		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		if tenantID == "" {
+			tenantID = "tnt_demo"
+		}
+		actorRole := strings.TrimSpace(r.Header.Get("X-User-Role"))
+		if actorRole == "" {
+			actorRole = "owner"
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"items": users.listUsers(tenantID)}})
+		case http.MethodPost:
+			var req createUserRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+				return
+			}
+			u, err := users.createUser(tenantID, actorRole, req)
+			if err != nil {
+				if err.Error() == "forbidden" {
+					writeError(w, http.StatusForbidden, "forbidden", "insufficient role")
+					return
+				}
+				writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]any{"user": u}})
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+		}
+	})
+
+	mux.HandleFunc("/api/v1/users/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+			return
+		}
+		if !strings.HasSuffix(r.URL.Path, "/role") {
+			writeError(w, http.StatusNotFound, "not_found", "endpoint not found")
+			return
+		}
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1/users/")
+		path = strings.TrimSuffix(path, "/role")
+		userID := strings.Trim(path, "/")
+		if userID == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "user id is required")
+			return
+		}
+
+		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		if tenantID == "" {
+			tenantID = "tnt_demo"
+		}
+		actorRole := strings.TrimSpace(r.Header.Get("X-User-Role"))
+
+		var req updateUserRoleRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+			return
+		}
+
+		u, err := users.updateRole(tenantID, actorRole, userID, req.Role)
+		if err != nil {
+			switch err.Error() {
+			case "forbidden":
+				writeError(w, http.StatusForbidden, "forbidden", "only owner can change role")
+			case "invalid role":
+				writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+			case "user not found":
+				writeError(w, http.StatusNotFound, "not_found", err.Error())
+			default:
+				writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"user": u}})
+	})
+
 	return mux
 }
 
-func signToken(secret, sub, tenantID, role, email string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":       sub,
-		"tenant_id": tenantID,
-		"role":      role,
-		"email":     email,
-		"exp":       time.Now().Add(24 * time.Hour).Unix(),
-		"iat":       time.Now().Unix(),
+func signToken(secret string, u appUser) (string, error) {
+	perms := rolePermissions[u.Role]
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, customClaims{
+		TenantID:    u.TenantID,
+		Role:        u.Role,
+		Email:       u.Email,
+		Permissions: perms,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   u.ID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
 	})
 	return token.SignedString([]byte(secret))
+}
+
+func inferRoleFromEmail(email string) string {
+	e := strings.ToLower(email)
+	switch {
+	case strings.Contains(e, "owner"):
+		return "owner"
+	case strings.Contains(e, "admin"):
+		return "admin"
+	case strings.Contains(e, "agent"):
+		return "agent"
+	default:
+		return "viewer"
+	}
+}
+
+func nameFromEmail(email string) string {
+	parts := strings.Split(email, "@")
+	name := strings.ReplaceAll(parts[0], ".", " ")
+	name = strings.ReplaceAll(name, "_", " ")
+	if name == "" {
+		return "User"
+	}
+	return strings.Title(name)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

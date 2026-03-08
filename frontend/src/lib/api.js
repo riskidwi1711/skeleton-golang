@@ -15,8 +15,7 @@ export async function login(email = 'owner@acme.com') {
   })
 
   if (!res.ok) throw new Error('Login failed')
-  const data = await res.json()
-  return data.token
+  return res.json()
 }
 
 export async function listTenants(token) {
@@ -59,6 +58,48 @@ export async function registerTenant(payload) {
   }
 
   return res.json()
+}
+
+export async function listRoles() {
+  const res = await fetch(`${API_BASE}/api/v1/roles`, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch roles failed')
+  const data = await res.json()
+  return data?.data?.items || []
+}
+
+export async function listUsers() {
+  const res = await fetch(`${API_BASE}/api/v1/users`, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch users failed')
+  const data = await res.json()
+  return data?.data?.items || []
+}
+
+export async function createUser(payload) {
+  const res = await fetch(`${API_BASE}/api/v1/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.error?.message || 'Create user failed')
+  }
+  const data = await res.json()
+  return data?.data?.user
+}
+
+export async function updateUserRole(id, role) {
+  const res = await fetch(`${API_BASE}/api/v1/users/${id}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ role }),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.error?.message || 'Update role failed')
+  }
+  const data = await res.json()
+  return data?.data?.user
 }
 
 export async function listTickets(params = {}) {

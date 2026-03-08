@@ -33,33 +33,59 @@ func NewServer(cfg Config) http.Handler {
 		authProxy.ServeHTTP(w, r)
 	}))
 
+	mux.HandleFunc("/api/v1/roles", withRequestID(jwtGuard(requirePermission("users:read")(func(w http.ResponseWriter, r *http.Request) {
+		authProxy.ServeHTTP(w, r)
+	}))))
+
+	mux.HandleFunc("/api/v1/users", withRequestID(jwtGuard(requirePermission("users:read", "users:write")(func(w http.ResponseWriter, r *http.Request) {
+		authProxy.ServeHTTP(w, r)
+	}))))
+	mux.HandleFunc("/api/v1/users/", withRequestID(jwtGuard(requirePermission("users:write")(func(w http.ResponseWriter, r *http.Request) {
+		authProxy.ServeHTTP(w, r)
+	}))))
+
 	mux.HandleFunc("/api/v1/tenants/onboard", withRequestID(func(w http.ResponseWriter, r *http.Request) {
 		tenantProxy.ServeHTTP(w, r)
 	}))
 
-	mux.HandleFunc("/api/v1/tenants", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/tenants", withRequestID(jwtGuard(requirePermission("tenants:read")(func(w http.ResponseWriter, r *http.Request) {
 		tenantProxy.ServeHTTP(w, r)
-	})))
+	}))))
 
-	mux.HandleFunc("/api/v1/tenants/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/tenants/", withRequestID(jwtGuard(requirePermission("tenants:read")(func(w http.ResponseWriter, r *http.Request) {
 		tenantProxy.ServeHTTP(w, r)
-	})))
+	}))))
 
-	mux.HandleFunc("/api/v1/tickets", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
-		ticketProxy.ServeHTTP(w, r)
-	})))
-	mux.HandleFunc("/api/v1/tickets/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
-		ticketProxy.ServeHTTP(w, r)
-	})))
+	mux.HandleFunc("/api/v1/tickets", withRequestID(jwtGuard(permissionByMethod(
+		func(w http.ResponseWriter, r *http.Request) { ticketProxy.ServeHTTP(w, r) },
+		map[string][]string{http.MethodGet: []string{"tickets:read"}, http.MethodPost: []string{"tickets:write"}},
+	))))
+	mux.HandleFunc("/api/v1/tickets/", withRequestID(jwtGuard(permissionByMethod(
+		func(w http.ResponseWriter, r *http.Request) { ticketProxy.ServeHTTP(w, r) },
+		map[string][]string{http.MethodGet: []string{"tickets:read"}, http.MethodPut: []string{"tickets:write"}, http.MethodPatch: []string{"tickets:write"}},
+	))))
 
-	mux.HandleFunc("/api/v1/assets", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
-		assetProxy.ServeHTTP(w, r)
-	})))
-	mux.HandleFunc("/api/v1/assets/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
-		assetProxy.ServeHTTP(w, r)
-	})))
+	mux.HandleFunc("/api/v1/assets", withRequestID(jwtGuard(permissionByMethod(
+		func(w http.ResponseWriter, r *http.Request) { assetProxy.ServeHTTP(w, r) },
+		map[string][]string{http.MethodGet: []string{"assets:read"}, http.MethodPost: []string{"assets:write"}},
+	))))
+	mux.HandleFunc("/api/v1/assets/", withRequestID(jwtGuard(permissionByMethod(
+		func(w http.ResponseWriter, r *http.Request) { assetProxy.ServeHTTP(w, r) },
+		map[string][]string{http.MethodGet: []string{"assets:read"}, http.MethodPut: []string{"assets:write"}, http.MethodPatch: []string{"assets:write"}, http.MethodDelete: []string{"assets:write"}},
+	))))
 
 	return mux
+}
+
+func permissionByMethod(next http.HandlerFunc, rules map[string][]string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		required, ok := rules[r.Method]
+		if !ok {
+			next(w, r)
+			return
+		}
+		requirePermission(required...)(next)(w, r)
+	}
 }
 
 func mustProxy(raw string) *httputil.ReverseProxy {
