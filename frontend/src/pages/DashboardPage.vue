@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { listTenants } from '../lib/api'
-import { getToken } from '../lib/auth'
+import { getToken, getUser } from '../lib/auth'
 
 const loading = ref(true)
 const error = ref('')
 const tenants = ref([])
 const now = ref(new Date())
+const me = ref(getUser() || { name: 'User', role: 'viewer' })
 
 onMounted(async () => {
   try {
@@ -31,10 +32,10 @@ const timeText = computed(() =>
   <div>
     <div class="hero-row">
       <div>
-        <h3 class="page-title">Selamat Datang, Riski!</h3>
+        <h3 class="page-title">Welcome back, {{ me.name }}!</h3>
         <p class="muted"><span class="meta-chip">Date</span> {{ dateText }} &nbsp;&nbsp;•&nbsp;&nbsp; <span class="meta-chip">Time</span> {{ timeText }}</p>
       </div>
-      <div class="muted right-note">Admin<br />Head Office Jakarta</div>
+      <div class="muted right-note">Role: {{ me.role }}<br />Tenant workspace</div>
     </div>
 
     <div v-if="loading" class="card mt-16">Loading dashboard...</div>
@@ -52,7 +53,7 @@ const timeText = computed(() =>
         </div>
         <div class="stat-card green">
           <div>
-            <p>Total Cabang</p>
+            <p>Total Branches</p>
             <h4>38</h4>
             <small>8 active</small>
           </div>
@@ -60,7 +61,7 @@ const timeText = computed(() =>
         </div>
         <div class="stat-card purple">
           <div>
-            <p>Total Divisi</p>
+            <p>Total Departments</p>
             <h4>48</h4>
             <small>Across all branches</small>
           </div>

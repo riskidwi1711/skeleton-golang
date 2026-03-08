@@ -6,6 +6,7 @@ import { setSession } from '../lib/auth'
 
 const router = useRouter()
 const email = ref('owner@acme.com')
+const password = ref('demo12345')
 const loading = ref(false)
 const error = ref('')
 
@@ -13,7 +14,7 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
-    const session = await login(email.value)
+    const session = await login(email.value, password.value)
     setSession(session)
     router.push('/dashboard')
   } catch (e) {
@@ -39,6 +40,11 @@ async function submit() {
         <label>
           Email
           <input v-model="email" type="email" placeholder="owner@acme.com" required />
+        </label>
+
+        <label>
+          Password
+          <input v-model="password" type="password" placeholder="Enter password" required />
         </label>
 
         <button class="btn" :disabled="loading">{{ loading ? 'Signing in...' : 'Sign In' }}</button>

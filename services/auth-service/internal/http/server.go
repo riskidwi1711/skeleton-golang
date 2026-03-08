@@ -19,7 +19,8 @@ type Config struct {
 }
 
 type loginRequest struct {
-	Email string `json:"email"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type registerTenantRequest struct {
@@ -31,9 +32,10 @@ type registerTenantRequest struct {
 }
 
 type createUserRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	Password string `json:"password"`
 }
 
 type updateUserRoleRequest struct {
@@ -57,6 +59,7 @@ type appUser struct {
 	Email    string    `json:"email"`
 	Role     string    `json:"role"`
 	TenantID string    `json:"tenant_id"`
+	Password string    `json:"-"`
 	Created  time.Time `json:"created_at"`
 }
 
@@ -75,58 +78,36 @@ type customClaims struct {
 }
 
 var rolePermissions = map[string][]string{
-	"owner": {
-		"dashboard:read", "tickets:read", "tickets:write", "assets:read", "assets:write", "users:read", "users:write", "tenants:read",
-	},
-	"admin": {
-		"dashboard:read", "tickets:read", "tickets:write", "assets:read", "assets:write", "users:read", "tenants:read",
-	},
-	"agent": {
-		"dashboard:read", "tickets:read", "tickets:write", "assets:read",
-	},
-	"viewer": {
-		"dashboard:read", "tickets:read", "assets:read",
-	},
+	"owner":  {"dashboard:read", "tickets:read", "tickets:write", "assets:read", "assets:write", "users:read", "users:write", "tenants:read"},
+	"admin":  {"dashboard:read", "tickets:read", "tickets:write", "assets:read", "assets:write", "users:read", "tenants:read"},
+	"agent":  {"dashboard:read", "tickets:read", "tickets:write", "assets:read"},
+	"viewer": {"dashboard:read", "tickets:read", "assets:read"},
 }
 
 type userStore struct {
 	mu    sync.RWMutex
-	items map[string]map[string]appUser // tenantID -> email -> user
+	items map[string]map[string]appUser
 }
 
 func newUserStore() *userStore {
 	now := time.Now()
+	seed := "demo12345"
 	return &userStore{items: map[string]map[string]appUser{
 		"tnt_demo": {
-			"owner@acme.com": {
-				ID: "u-1", Name: "Owner Demo", Email: "owner@acme.com", Role: "owner", TenantID: "tnt_demo", Created: now,
-			},
-			"admin@acme.com": {
-				ID: "u-2", Name: "Admin Demo", Email: "admin@acme.com", Role: "admin", TenantID: "tnt_demo", Created: now,
-			},
-			"agent@acme.com": {
-				ID: "u-3", Name: "Agent Demo", Email: "agent@acme.com", Role: "agent", TenantID: "tnt_demo", Created: now,
-			},
-			"viewer@acme.com": {
-				ID: "u-4", Name: "Viewer Demo", Email: "viewer@acme.com", Role: "viewer", TenantID: "tnt_demo", Created: now,
-			},
+			"owner@acme.com":  {ID: "u-1", Name: "Owner Demo", Email: "owner@acme.com", Role: "owner", TenantID: "tnt_demo", Password: seed, Created: now},
+			"admin@acme.com":  {ID: "u-2", Name: "Admin Demo", Email: "admin@acme.com", Role: "admin", TenantID: "tnt_demo", Password: seed, Created: now},
+			"agent@acme.com":  {ID: "u-3", Name: "Agent Demo", Email: "agent@acme.com", Role: "agent", TenantID: "tnt_demo", Password: seed, Created: now},
+			"viewer@acme.com": {ID: "u-4", Name: "Viewer Demo", Email: "viewer@acme.com", Role: "viewer", TenantID: "tnt_demo", Password: seed, Created: now},
 		},
 	}}
 }
 
-func (s *userStore) getOrCreateUser(email, tenantID string) appUser {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.items[tenantID] == nil {
-		s.items[tenantID] = map[string]appUser{}
-	}
-	if u, ok := s.items[tenantID][email]; ok {
-		return u
-	}
-	role := inferRoleFromEmail(email)
-	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: nameFromEmail(email), Email: email, Role: role, TenantID: tenantID, Created: time.Now()}
-	s.items[tenantID][email] = u
-	return u
+func (s *userStore) findByEmail(tenantID, email string) (appUser, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tenant := s.items[tenantID]
+	u, ok := tenant[email]
+	return u, ok
 }
 
 func (s *userStore) listUsers(tenantID string) []appUser {
@@ -134,6 +115,7 @@ func (s *userStore) listUsers(tenantID string) []appUser {
 	defer s.mu.RUnlock()
 	users := make([]appUser, 0, len(s.items[tenantID]))
 	for _, u := range s.items[tenantID] {
+		u.Password = ""
 		users = append(users, u)
 	}
 	sort.Slice(users, func(i, j int) bool { return users[i].Created.After(users[j].Created) })
@@ -147,8 +129,12 @@ func (s *userStore) createUser(tenantID, actorRole string, req createUserRequest
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 	req.Name = strings.TrimSpace(req.Name)
 	req.Role = strings.TrimSpace(strings.ToLower(req.Role))
+	req.Password = strings.TrimSpace(req.Password)
 	if req.Email == "" || req.Name == "" || req.Role == "" {
 		return appUser{}, fmt.Errorf("name, email, role are required")
+	}
+	if req.Password == "" {
+		req.Password = "welcome123"
 	}
 	if _, ok := rolePermissions[req.Role]; !ok {
 		return appUser{}, fmt.Errorf("invalid role")
@@ -161,8 +147,9 @@ func (s *userStore) createUser(tenantID, actorRole string, req createUserRequest
 	if _, exists := s.items[tenantID][req.Email]; exists {
 		return appUser{}, fmt.Errorf("email already exists")
 	}
-	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: req.Name, Email: req.Email, Role: req.Role, TenantID: tenantID, Created: time.Now()}
+	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: req.Name, Email: req.Email, Role: req.Role, TenantID: tenantID, Password: req.Password, Created: time.Now()}
 	s.items[tenantID][req.Email] = u
+	u.Password = ""
 	return u, nil
 }
 
@@ -189,6 +176,7 @@ func (s *userStore) updateRole(tenantID, actorRole, userID, role string) (appUse
 		if u.ID == userID {
 			u.Role = role
 			s.items[tenantID][email] = u
+			u.Password = ""
 			return u, nil
 		}
 	}
@@ -198,6 +186,7 @@ func (s *userStore) updateRole(tenantID, actorRole, userID, role string) (appUse
 func NewServer(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 	users := newUserStore()
+
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -208,20 +197,54 @@ func NewServer(cfg Config) http.Handler {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 			return
 		}
-
 		var req loginRequest
-		_ = json.NewDecoder(r.Body).Decode(&req)
-		req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-		if req.Email == "" {
-			req.Email = "owner@acme.com"
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+			return
 		}
-		u := users.getOrCreateUser(req.Email, "tnt_demo")
+		req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+		req.Password = strings.TrimSpace(req.Password)
+		if req.Email == "" || req.Password == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "email and password are required")
+			return
+		}
+		u, ok := users.findByEmail("tnt_demo", req.Email)
+		if !ok || u.Password != req.Password {
+			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+			return
+		}
 		token, err := signToken(cfg.JWTSecret, u)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "token_sign_failed", "failed to sign token")
 			return
 		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"token": token,
+			"user":  map[string]any{"id": u.ID, "role": u.Role, "email": u.Email, "name": u.Name, "permissions": rolePermissions[u.Role]},
+		})
+	})
 
+	mux.HandleFunc("/api/v1/auth/refresh", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+			return
+		}
+		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		email := strings.TrimSpace(strings.ToLower(r.Header.Get("X-User-Email")))
+		if tenantID == "" || email == "" {
+			writeError(w, http.StatusUnauthorized, "missing_identity", "missing user identity")
+			return
+		}
+		u, ok := users.findByEmail(tenantID, email)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "user_not_found", "user not found")
+			return
+		}
+		token, err := signToken(cfg.JWTSecret, u)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "token_sign_failed", "failed to sign token")
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"token": token,
 			"user":  map[string]any{"id": u.ID, "role": u.Role, "email": u.Email, "name": u.Name, "permissions": rolePermissions[u.Role]},
@@ -233,18 +256,16 @@ func NewServer(cfg Config) http.Handler {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 			return
 		}
-
 		var req registerTenantRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 			return
 		}
-
 		req.CompanyName = strings.TrimSpace(req.CompanyName)
 		req.FullName = strings.TrimSpace(req.FullName)
 		req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+		req.Password = strings.TrimSpace(req.Password)
 		req.Plan = strings.TrimSpace(req.Plan)
-
 		if req.CompanyName == "" || req.FullName == "" || req.Email == "" || req.Password == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "company_name, full_name, email, password are required")
 			return
@@ -254,54 +275,36 @@ func NewServer(cfg Config) http.Handler {
 		}
 
 		tenantURL := strings.TrimSuffix(cfg.TenantServiceURL, "/") + "/api/v1/tenants/onboard"
-		bodyBytes, _ := json.Marshal(map[string]any{
-			"company_name": req.CompanyName,
-			"admin_email":  req.Email,
-			"plan":         req.Plan,
-		})
-
+		bodyBytes, _ := json.Marshal(map[string]any{"company_name": req.CompanyName, "admin_email": req.Email, "plan": req.Plan})
 		onboardResp, err := http.Post(tenantURL, "application/json", bytes.NewReader(bodyBytes))
 		if err != nil {
 			writeError(w, http.StatusBadGateway, "tenant_service_unreachable", err.Error())
 			return
 		}
 		defer onboardResp.Body.Close()
-
 		if onboardResp.StatusCode >= 400 {
 			writeError(w, http.StatusBadGateway, "tenant_onboard_failed", fmt.Sprintf("tenant service status %d", onboardResp.StatusCode))
 			return
 		}
-
 		var tr tenantResponse
 		if err := json.NewDecoder(onboardResp.Body).Decode(&tr); err != nil {
 			writeError(w, http.StatusBadGateway, "tenant_decode_failed", "failed to decode tenant response")
 			return
 		}
-
 		tenantID := tr.Data.Tenant.TenantID
 		if tenantID == "" {
 			tenantID = "tnt_demo"
 		}
-
-		u := users.getOrCreateUser(req.Email, tenantID)
-		u.Role = "owner"
-		u.Name = req.FullName
+		u := appUser{ID: "u-owner", Name: req.FullName, Email: req.Email, Role: "owner", TenantID: tenantID, Password: req.Password, Created: time.Now()}
 		users.upsertUser(u)
-
 		token, err := signToken(cfg.JWTSecret, u)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "token_sign_failed", "failed to sign token")
 			return
 		}
-
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"token": token,
-			"user": map[string]any{
-				"id":    u.ID,
-				"name":  u.Name,
-				"email": u.Email,
-				"role":  u.Role,
-			},
+			"token":  token,
+			"user":   map[string]any{"id": u.ID, "name": u.Name, "email": u.Email, "role": u.Role},
 			"tenant": tr.Data.Tenant,
 		})
 	})
@@ -328,7 +331,6 @@ func NewServer(cfg Config) http.Handler {
 		if actorRole == "" {
 			actorRole = "owner"
 		}
-
 		switch r.Method {
 		case http.MethodGet:
 			writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"items": users.listUsers(tenantID)}})
@@ -362,26 +364,21 @@ func NewServer(cfg Config) http.Handler {
 			writeError(w, http.StatusNotFound, "not_found", "endpoint not found")
 			return
 		}
-		path := strings.TrimPrefix(r.URL.Path, "/api/v1/users/")
-		path = strings.TrimSuffix(path, "/role")
-		userID := strings.Trim(path, "/")
+		userID := strings.Trim(strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/users/"), "/role"), "/")
 		if userID == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "user id is required")
 			return
 		}
-
 		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 		if tenantID == "" {
 			tenantID = "tnt_demo"
 		}
 		actorRole := strings.TrimSpace(r.Header.Get("X-User-Role"))
-
 		var req updateUserRoleRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 			return
 		}
-
 		u, err := users.updateRole(tenantID, actorRole, userID, req.Role)
 		if err != nil {
 			switch err.Error() {
@@ -418,30 +415,6 @@ func signToken(secret string, u appUser) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-func inferRoleFromEmail(email string) string {
-	e := strings.ToLower(email)
-	switch {
-	case strings.Contains(e, "owner"):
-		return "owner"
-	case strings.Contains(e, "admin"):
-		return "admin"
-	case strings.Contains(e, "agent"):
-		return "agent"
-	default:
-		return "viewer"
-	}
-}
-
-func nameFromEmail(email string) string {
-	parts := strings.Split(email, "@")
-	name := strings.ReplaceAll(parts[0], ".", " ")
-	name = strings.ReplaceAll(name, "_", " ")
-	if name == "" {
-		return "User"
-	}
-	return strings.Title(name)
-}
-
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -449,10 +422,5 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, map[string]any{
-		"error": map[string]any{
-			"code":    code,
-			"message": message,
-		},
-	})
+	writeJSON(w, status, map[string]any{"error": map[string]any{"code": code, "message": message}})
 }

@@ -29,6 +29,10 @@ func NewServer(cfg Config) http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	mux.HandleFunc("/api/v1/auth/refresh", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		authProxy.ServeHTTP(w, r)
+	})))
+
 	mux.HandleFunc("/api/v1/auth/", withRequestID(func(w http.ResponseWriter, r *http.Request) {
 		authProxy.ServeHTTP(w, r)
 	}))

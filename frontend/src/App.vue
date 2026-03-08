@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { clearToken, getUser, hasPermission } from './lib/auth'
+import { clearToken, getUser, hasPermission, isAuthed, setSession } from './lib/auth'
+import { refreshSession } from './lib/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,10 +39,6 @@ const topbarActionMap = {
     { label: 'Import CSV', variant: 'secondary' },
     { label: 'Export Assets', variant: 'secondary' },
   ],
-  '/onboarding': [
-    { label: 'Create Tenant', variant: 'primary' },
-    { label: 'View Logs', variant: 'secondary' },
-  ],
   '/access': [
     { label: 'Invite User', variant: 'primary' },
     { label: 'Review Roles', variant: 'secondary' },
@@ -53,7 +50,6 @@ const pageActions = computed(() => topbarActionMap[route.path] || [])
 function handleTopbarAction(actionLabel) {
   if (route.path === '/tickets' && actionLabel === 'New Ticket') return router.push('/tickets')
   if (route.path === '/assets' && actionLabel === 'Add Asset') return router.push('/assets')
-  if (route.path === '/onboarding' && actionLabel === 'Create Tenant') return router.push('/onboarding')
 }
 
 function toggleUserMenu() {
@@ -83,8 +79,16 @@ function logout() {
   router.push('/login')
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', onDocClick)
+  if (!isAuthPage.value && isAuthed()) {
+    try {
+      const session = await refreshSession()
+      setSession(session)
+    } catch {
+      // keep existing session, user can relogin if needed
+    }
+  }
 })
 
 onBeforeUnmount(() => {
@@ -118,7 +122,6 @@ onBeforeUnmount(() => {
         <RouterLink to="/tickets" class="nav-item">Service Desk <span>▾</span></RouterLink>
         <RouterLink to="/assets" class="nav-item">Asset Management <span>▾</span></RouterLink>
         <RouterLink v-if="hasPermission('users:read')" to="/access" class="nav-item">Users & Access <span>▾</span></RouterLink>
-        <RouterLink v-if="hasPermission('tenants:read')" to="/onboarding" class="nav-item">Tenant Onboarding <span>▾</span></RouterLink>
       </nav>
     </aside>
 

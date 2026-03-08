@@ -7,14 +7,26 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export async function login(email = 'owner@acme.com') {
+export async function login(email = 'owner@acme.com', password = 'demo12345') {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, password }),
   })
 
-  if (!res.ok) throw new Error('Login failed')
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.error?.message || 'Login failed')
+  }
+  return res.json()
+}
+
+export async function refreshSession() {
+  const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+    method: 'POST',
+    headers: { ...authHeaders() },
+  })
+  if (!res.ok) throw new Error('Session refresh failed')
   return res.json()
 }
 

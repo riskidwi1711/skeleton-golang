@@ -9,7 +9,7 @@ const roles = ref([])
 const loading = ref(false)
 const error = ref('')
 
-const form = ref({ name: '', email: '', role: 'agent' })
+const form = ref({ name: '', email: '', role: 'agent', password: 'welcome123' })
 
 async function loadData() {
   loading.value = true
@@ -30,7 +30,7 @@ async function submitCreate() {
   error.value = ''
   try {
     await createUser(form.value)
-    form.value = { name: '', email: '', role: 'agent' }
+    form.value = { name: '', email: '', role: 'agent', password: 'welcome123' }
     await loadData()
   } catch (e) {
     error.value = e.message || 'Create user failed'
@@ -76,6 +76,10 @@ onMounted(loadData)
             <select v-model="form.role">
               <option v-for="r in roles" :key="r.name" :value="r.name">{{ r.label || r.name }}</option>
             </select>
+          </label>
+          <label>
+            Temporary Password
+            <input v-model="form.password" placeholder="welcome123" />
           </label>
           <button class="btn" type="submit">Create User</button>
         </form>
