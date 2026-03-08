@@ -1,106 +1,25 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { listAssets, createAsset as apiCreateAsset, assetStats } from '../lib/api'
 
 const activeTab = ref('hardware')
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const filterCategory = ref('all')
 const filterDepartment = ref('all')
+const loading = ref(false)
 
-// Mock asset data
-const assets = ref([
-  {
-    id: 'AST-2024-001',
-    name: 'Dell Latitude 5520',
-    category: 'Laptop',
-    type: 'hardware',
-    status: 'active',
-    assignedTo: 'John Smith',
-    department: 'Engineering',
-    location: 'Building A, Floor 3',
-    serialNumber: 'DL5520X4821',
-    purchaseDate: '2023-06-15',
-    warrantyExpiry: '2026-06-14',
-    value: '$1,200'
-  },
-  {
-    id: 'AST-2024-002',
-    name: 'HP EliteDesk 800 G6',
-    category: 'Desktop',
-    type: 'hardware',
-    status: 'active',
-    assignedTo: 'Sarah Johnson',
-    department: 'Finance',
-    location: 'Building B, Floor 2',
-    serialNumber: 'HP800G692323',
-    purchaseDate: '2023-08-20',
-    warrantyExpiry: '2026-08-19',
-    value: '$900'
-  },
-  {
-    id: 'AST-2024-003',
-    name: 'Microsoft Office 365',
-    category: 'Productivity',
-    type: 'software',
-    status: 'active',
-    assignedTo: 'Multiple Users',
-    department: 'Company-wide',
-    location: 'Cloud',
-    licenseKey: 'XXXX-XXXX-XXXX',
-    purchaseDate: '2024-01-01',
-    expiryDate: '2024-12-31',
-    value: '$150/year'
-  },
-  {
-    id: 'AST-2024-004',
-    name: 'iPhone 13 Pro',
-    category: 'Mobile',
-    type: 'hardware',
-    status: 'active',
-    assignedTo: 'Mike Chen',
-    department: 'Sales',
-    location: 'Remote',
-    serialNumber: 'IP13PRO7654',
-    purchaseDate: '2023-11-10',
-    warrantyExpiry: '2024-11-09',
-    value: '$999'
-  },
-  {
-    id: 'AST-2024-005',
-    name: 'Adobe Creative Cloud',
-    category: 'Design',
-    type: 'software',
-    status: 'active',
-    assignedTo: 'Design Team',
-    department: 'Marketing',
-    location: 'Cloud',
-    licenseKey: 'XXXX-XXXX-XXXX',
-    purchaseDate: '2024-02-01',
-    expiryDate: '2025-01-31',
-    value: '$600/year'
-  },
-  {
-    id: 'AST-2024-006',
-    name: 'ThinkPad X1 Carbon',
-    category: 'Laptop',
-    type: 'hardware',
-    status: 'maintenance',
-    assignedTo: 'Unassigned',
-    department: 'IT',
-    location: 'IT Storage',
-    serialNumber: 'TPX1C3892',
-    purchaseDate: '2022-04-15',
-    warrantyExpiry: '2025-04-14',
-    value: '$1,500'
-  }
-])
+const assets = ref([])
+const statsData = ref({ total: 0, hardware: 0, software: 0, active: 0 })
 
 const filteredAssets = computed(() => {
-  return assets.value.filter(asset => {
+  return assets.value.filter((asset) => {
+    const q = searchQuery.value.toLowerCase()
     const matchesTab = activeTab.value === 'all' || asset.type === activeTab.value
-    const matchesSearch = asset.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         asset.id.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         asset.serialNumber?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesSearch =
+      asset.name?.toLowerCase().includes(q) ||
+      asset.id?.toLowerCase().includes(q) ||
+      asset.serialNumber?.toLowerCase().includes(q)
     const matchesStatus = filterStatus.value === 'all' || asset.status === filterStatus.value
     const matchesCategory = filterCategory.value === 'all' || asset.category === filterCategory.value
     const matchesDepartment = filterDepartment.value === 'all' || asset.department === filterDepartment.value
@@ -109,34 +28,12 @@ const filteredAssets = computed(() => {
 })
 
 const statusColor = (status) => {
-  const colors = {
-    'active': 'green',
-    'inactive': 'gray',
-    'maintenance': 'yellow',
-    'retired': 'red'
-  }
+  const colors = { active: 'green', inactive: 'gray', maintenance: 'yellow', retired: 'red' }
   return colors[status] || 'gray'
 }
 
-const stats = computed(() => {
-  const hardwareCount = assets.value.filter(a => a.type === 'hardware').length
-  const softwareCount = assets.value.filter(a => a.type === 'software').length
-  const activeCount = assets.value.filter(a => a.status === 'active').length
-  const totalValue = assets.value.reduce((sum, asset) => {
-    const value = parseInt(asset.value.replace(/[^0-9]/g, '')) || 0
-    return sum + value
-  }, 0)
+const stats = computed(() => ({ ...statsData.value }))
 
-  return {
-    total: assets.value.length,
-    hardware: hardwareCount,
-    software: softwareCount,
-    active: activeCount,
-    totalValue: `$${totalValue.toLocaleString()}`
-  }
-})
-
-// New asset form
 const showNewAsset = ref(false)
 const newAsset = ref({
   name: '',
@@ -145,46 +42,62 @@ const newAsset = ref({
   serialNumber: '',
   department: '',
   location: '',
-  value: ''
+  value: '',
 })
 
-const createAsset = () => {
-  const asset = {
-    id: `AST-2024-${String(assets.value.length + 1).padStart(3, '0')}`,
-    name: newAsset.value.name,
-    category: newAsset.value.category,
-    type: newAsset.value.type,
-    status: 'active',
-    assignedTo: 'Unassigned',
-    department: newAsset.value.department,
-    location: newAsset.value.location,
-    serialNumber: newAsset.value.serialNumber,
-    purchaseDate: new Date().toISOString().split('T')[0],
-    warrantyExpiry: '',
-    value: newAsset.value.value
-  }
-  assets.value.unshift(asset)
-  showNewAsset.value = false
-  newAsset.value = {
-    name: '',
-    category: '',
-    type: 'hardware',
-    serialNumber: '',
-    department: '',
-    location: '',
-    value: ''
+function normalizeAsset(a) {
+  return {
+    ...a,
+    assignedTo: a.assignedTo || a.assigned_to || 'Unassigned',
+    serialNumber: a.serialNumber || a.serial_number || '',
   }
 }
 
-const categories = computed(() => {
-  const cats = new Set(assets.value.map(a => a.category))
-  return Array.from(cats)
-})
+async function loadAssets() {
+  loading.value = true
+  try {
+    const data = await listAssets()
+    assets.value = (data || []).map(normalizeAsset)
+    const st = await assetStats()
+    statsData.value = {
+      total: st.total || 0,
+      hardware: st.hardware || 0,
+      software: st.software || 0,
+      active: st.active || 0,
+    }
+  } catch {
+    // keep UI usable when backend is down
+  } finally {
+    loading.value = false
+  }
+}
 
-const departments = computed(() => {
-  const depts = new Set(assets.value.map(a => a.department))
-  return Array.from(depts)
-})
+async function createAsset() {
+  if (!newAsset.value.name || !newAsset.value.category) return
+  try {
+    await apiCreateAsset({
+      ...newAsset.value,
+      purchase_date: new Date().toISOString().slice(0, 10),
+    })
+    showNewAsset.value = false
+    newAsset.value = { name: '', category: '', type: 'hardware', serialNumber: '', department: '', location: '', value: '' }
+    await loadAssets()
+  } catch {
+    assets.value.unshift(
+      normalizeAsset({
+        id: `AST-2024-${String(assets.value.length + 1).padStart(3, '0')}`,
+        ...newAsset.value,
+        status: 'active',
+      })
+    )
+    showNewAsset.value = false
+  }
+}
+
+const categories = computed(() => Array.from(new Set(assets.value.map((a) => a.category))))
+const departments = computed(() => Array.from(new Set(assets.value.map((a) => a.department))))
+
+onMounted(loadAssets)
 </script>
 
 <template>

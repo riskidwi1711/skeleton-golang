@@ -13,6 +13,8 @@ func main() {
 	cfg := apphttp.Config{
 		AuthServiceURL:   getenv("AUTH_SERVICE_URL", "http://auth-service:8081"),
 		TenantServiceURL: getenv("TENANT_SERVICE_URL", "http://tenant-service:8082"),
+		TicketServiceURL: getenv("TICKET_SERVICE_URL", "http://ticket-service:8083"),
+		AssetServiceURL:  getenv("ASSET_SERVICE_URL", "http://asset-service:8084"),
 		JWTSecret:        getenv("JWT_SECRET", "dev-secret"),
 	}
 

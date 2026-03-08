@@ -1,71 +1,20 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { listTickets, createTicket as apiCreateTicket, ticketStats } from '../lib/api'
 
 const activeTab = ref('list')
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const filterPriority = ref('all')
+const loading = ref(false)
 
-// Mock ticket data
-const tickets = ref([
-  {
-    id: 'INC-2024-001',
-    title: 'Email service down for marketing team',
-    description: 'Multiple users reporting inability to send/receive emails since 9 AM',
-    status: 'open',
-    priority: 'high',
-    category: 'Email',
-    assignee: 'John Smith',
-    requester: 'Sarah Johnson',
-    created: '2024-03-08 09:15',
-    updated: '2024-03-08 10:30',
-    sla: { response: '1h', resolution: '4h', remaining: '2h 30m' }
-  },
-  {
-    id: 'INC-2024-002',
-    title: 'Slow network performance in Building B',
-    description: 'Users experiencing intermittent connectivity and slow speeds',
-    status: 'in-progress',
-    priority: 'medium',
-    category: 'Network',
-    assignee: 'Mike Chen',
-    requester: 'David Lee',
-    created: '2024-03-08 10:00',
-    updated: '2024-03-08 11:00',
-    sla: { response: '2h', resolution: '8h', remaining: '6h' }
-  },
-  {
-    id: 'REQ-2024-003',
-    title: 'New laptop request for new hire',
-    description: 'Standard developer setup needed for new team member starting Monday',
-    status: 'pending',
-    priority: 'low',
-    category: 'Hardware',
-    assignee: 'Unassigned',
-    requester: 'HR Department',
-    created: '2024-03-08 11:30',
-    updated: '2024-03-08 11:30',
-    sla: { response: '4h', resolution: '48h', remaining: '47h' }
-  },
-  {
-    id: 'INC-2024-004',
-    title: 'Cannot access shared drive',
-    description: 'Finance team unable to access Q1 reports on shared drive',
-    status: 'resolved',
-    priority: 'high',
-    category: 'File Server',
-    assignee: 'Lisa Wang',
-    requester: 'Finance Team',
-    created: '2024-03-07 14:00',
-    updated: '2024-03-07 16:45',
-    sla: { response: '1h', resolution: '4h', remaining: 'Completed' }
-  }
-])
+const tickets = ref([])
+const statsData = ref({ total: 0, open: 0, inProgress: 0, resolved: 0 })
 
 const filteredTickets = computed(() => {
-  return tickets.value.filter(ticket => {
-    const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         ticket.id.toLowerCase().includes(searchQuery.value.toLowerCase())
+  return tickets.value.filter((ticket) => {
+    const q = searchQuery.value.toLowerCase()
+    const matchesSearch = ticket.title?.toLowerCase().includes(q) || ticket.id?.toLowerCase().includes(q)
     const matchesStatus = filterStatus.value === 'all' || ticket.status === filterStatus.value
     const matchesPriority = filterPriority.value === 'all' || ticket.priority === filterPriority.value
     return matchesSearch && matchesStatus && matchesPriority
@@ -73,61 +22,76 @@ const filteredTickets = computed(() => {
 })
 
 const statusColor = (status) => {
-  const colors = {
-    'open': 'red',
-    'in-progress': 'yellow',
-    'pending': 'blue',
-    'resolved': 'green',
-    'closed': 'gray'
-  }
+  const colors = { open: 'red', 'in-progress': 'yellow', pending: 'blue', resolved: 'green', closed: 'gray' }
   return colors[status] || 'gray'
 }
 
 const priorityColor = (priority) => {
-  const colors = {
-    'high': 'red',
-    'medium': 'yellow',
-    'low': 'green'
-  }
+  const colors = { high: 'red', medium: 'yellow', low: 'green' }
   return colors[priority] || 'gray'
 }
 
-const stats = computed(() => {
-  return {
-    total: tickets.value.length,
-    open: tickets.value.filter(t => t.status === 'open').length,
-    inProgress: tickets.value.filter(t => t.status === 'in-progress').length,
-    resolved: tickets.value.filter(t => t.status === 'resolved').length
-  }
-})
+const stats = computed(() => statsData.value)
 
-// New ticket form
 const showNewTicket = ref(false)
-const newTicket = ref({
-  title: '',
-  description: '',
-  category: '',
-  priority: 'medium'
-})
+const newTicket = ref({ title: '', description: '', category: '', priority: 'medium' })
 
-const createTicket = () => {
-  const ticket = {
-    id: `INC-2024-${String(tickets.value.length + 1).padStart(3, '0')}`,
-    title: newTicket.value.title,
-    description: newTicket.value.description,
-    status: 'open',
-    priority: newTicket.value.priority,
-    category: newTicket.value.category,
-    assignee: 'Unassigned',
-    requester: 'Current User',
-    created: new Date().toLocaleString('en-GB').slice(0, -3),
-    updated: new Date().toLocaleString('en-GB').slice(0, -3),
-    sla: { response: '2h', resolution: '8h', remaining: '8h' }
+function normalizeTicket(t) {
+  return {
+    ...t,
+    assignee: t.assignee || 'Unassigned',
+    requester: t.requester || 'Current User',
+    created: t.created_at || t.created,
+    updated: t.updated_at || t.updated,
+    sla: {
+      response: t.sla_response || '2h',
+      resolution: t.sla_resolve || '8h',
+      remaining: t.status === 'resolved' || t.status === 'closed' ? 'Completed' : t.sla_resolve || '8h',
+    },
   }
-  tickets.value.unshift(ticket)
-  showNewTicket.value = false
-  newTicket.value = { title: '', description: '', category: '', priority: 'medium' }
 }
+
+async function loadTickets() {
+  loading.value = true
+  try {
+    const data = await listTickets()
+    tickets.value = (data || []).map(normalizeTicket)
+    const st = await ticketStats()
+    statsData.value = {
+      total: st.total || 0,
+      open: st.open || 0,
+      inProgress: st.in_progress || 0,
+      resolved: st.resolved || 0,
+    }
+  } catch {
+    // keep UI usable even when backend is down
+  } finally {
+    loading.value = false
+  }
+}
+
+async function createTicket() {
+  if (!newTicket.value.title || !newTicket.value.category) return
+  try {
+    await apiCreateTicket(newTicket.value)
+    showNewTicket.value = false
+    newTicket.value = { title: '', description: '', category: '', priority: 'medium' }
+    await loadTickets()
+  } catch {
+    // fallback local optimistic create
+    tickets.value.unshift(
+      normalizeTicket({
+        id: `INC-2024-${String(tickets.value.length + 1).padStart(3, '0')}`,
+        ...newTicket.value,
+        status: 'open',
+      })
+    )
+    showNewTicket.value = false
+    newTicket.value = { title: '', description: '', category: '', priority: 'medium' }
+  }
+}
+
+onMounted(loadTickets)
 </script>
 
 <template>

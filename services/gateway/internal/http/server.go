@@ -10,6 +10,8 @@ import (
 type Config struct {
 	AuthServiceURL   string
 	TenantServiceURL string
+	TicketServiceURL string
+	AssetServiceURL  string
 	JWTSecret        string
 }
 
@@ -18,6 +20,8 @@ func NewServer(cfg Config) http.Handler {
 
 	authProxy := mustProxy(cfg.AuthServiceURL)
 	tenantProxy := mustProxy(cfg.TenantServiceURL)
+	ticketProxy := mustProxy(cfg.TicketServiceURL)
+	assetProxy := mustProxy(cfg.AssetServiceURL)
 	jwtGuard := requireJWT(cfg.JWTSecret)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +43,20 @@ func NewServer(cfg Config) http.Handler {
 
 	mux.HandleFunc("/api/v1/tenants/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
 		tenantProxy.ServeHTTP(w, r)
+	})))
+
+	mux.HandleFunc("/api/v1/tickets", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		ticketProxy.ServeHTTP(w, r)
+	})))
+	mux.HandleFunc("/api/v1/tickets/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		ticketProxy.ServeHTTP(w, r)
+	})))
+
+	mux.HandleFunc("/api/v1/assets", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		assetProxy.ServeHTTP(w, r)
+	})))
+	mux.HandleFunc("/api/v1/assets/", withRequestID(jwtGuard(func(w http.ResponseWriter, r *http.Request) {
+		assetProxy.ServeHTTP(w, r)
 	})))
 
 	return mux

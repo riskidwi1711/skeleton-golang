@@ -12,3 +12,6 @@ gcs.json
 # Build Directory
 bin
 .2024*
+
+# Local runtime
+.pids

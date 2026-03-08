@@ -1,4 +1,11 @@
+import { getToken } from './auth'
+
 const API_BASE = import.meta.env.VITE_API_BASE || ''
+
+function authHeaders() {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 export async function login(email = 'owner@acme.com') {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
@@ -51,5 +58,73 @@ export async function registerTenant(payload) {
     throw new Error(error?.error?.message || 'Registration failed')
   }
 
+  return res.json()
+}
+
+export async function listTickets(params = {}) {
+  const query = new URLSearchParams(params).toString()
+  const url = `${API_BASE}/api/v1/tickets${query ? `?${query}` : ''}`
+  const res = await fetch(url, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch tickets failed')
+  return res.json()
+}
+
+export async function createTicket(payload) {
+  const res = await fetch(`${API_BASE}/api/v1/tickets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Create ticket failed')
+  return res.json()
+}
+
+export async function updateTicket(id, payload) {
+  const res = await fetch(`${API_BASE}/api/v1/tickets/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Update ticket failed')
+  return res.json()
+}
+
+export async function ticketStats() {
+  const res = await fetch(`${API_BASE}/api/v1/tickets/stats`, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch ticket stats failed')
+  return res.json()
+}
+
+export async function listAssets(params = {}) {
+  const query = new URLSearchParams(params).toString()
+  const url = `${API_BASE}/api/v1/assets${query ? `?${query}` : ''}`
+  const res = await fetch(url, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch assets failed')
+  return res.json()
+}
+
+export async function createAsset(payload) {
+  const res = await fetch(`${API_BASE}/api/v1/assets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Create asset failed')
+  return res.json()
+}
+
+export async function updateAsset(id, payload) {
+  const res = await fetch(`${API_BASE}/api/v1/assets/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Update asset failed')
+  return res.json()
+}
+
+export async function assetStats() {
+  const res = await fetch(`${API_BASE}/api/v1/assets/stats`, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch asset stats failed')
   return res.json()
 }
