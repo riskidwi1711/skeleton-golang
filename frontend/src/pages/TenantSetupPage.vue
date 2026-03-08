@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { completeTenantSetup } from '../lib/api'
-import { getUser } from '../lib/auth'
+import { getUser, setTenantSetupCompleted } from '../lib/auth'
 
 const router = useRouter()
 const me = getUser() || {}
@@ -23,6 +23,7 @@ async function submit() {
   error.value = ''
   try {
     await completeTenantSetup(me.tenant_id, form.value)
+    setTenantSetupCompleted(true)
     router.push('/dashboard')
   } catch (e) {
     error.value = e.message || 'Setup failed'

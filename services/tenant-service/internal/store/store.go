@@ -30,5 +30,6 @@ type TenantSetupInput struct {
 type Store interface {
 	SaveTenant(ctx context.Context, tenant Tenant) (Tenant, error)
 	ListTenant(ctx context.Context) ([]Tenant, error)
+	GetTenantByID(ctx context.Context, tenantID string) (Tenant, error)
 	UpdateTenantSetup(ctx context.Context, tenantID string, in TenantSetupInput) (Tenant, error)
 }

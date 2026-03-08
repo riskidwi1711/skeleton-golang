@@ -109,8 +109,34 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) tenantRoutes(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasSuffix(r.URL.Path, "/setup") {
+	trimmed := strings.TrimPrefix(r.URL.Path, "/api/v1/tenants/")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
 		writeError(w, http.StatusNotFound, "not_found", "endpoint not found")
+		return
+	}
+
+	if !strings.HasSuffix(trimmed, "/setup") {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+			return
+		}
+		tenantID := trimmed
+		headerTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		if headerTenant != "" && headerTenant != tenantID {
+			writeError(w, http.StatusForbidden, "forbidden", "cross-tenant read not allowed")
+			return
+		}
+		tenant, err := s.store.GetTenantByID(r.Context(), tenantID)
+		if err != nil {
+			if err.Error() == "tenant not found" {
+				writeError(w, http.StatusNotFound, "not_found", err.Error())
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "query_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"tenant": tenant}})
 		return
 	}
 	if r.Method != http.MethodPut && r.Method != http.MethodPatch {
@@ -118,7 +144,6 @@ func (s *Server) tenantRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trimmed := strings.TrimPrefix(r.URL.Path, "/api/v1/tenants/")
 	tenantID := strings.TrimSuffix(trimmed, "/setup")
 	tenantID = strings.Trim(tenantID, "/")
 	if tenantID == "" {

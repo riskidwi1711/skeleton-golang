@@ -113,6 +113,29 @@ ORDER BY created_at_utc DESC
 	return items, rows.Err()
 }
 
+func (p *PostgresStore) GetTenantByID(ctx context.Context, tenantID string) (Tenant, error) {
+	query := `
+SELECT tenant_id, company_name, admin_email, plan, status, timezone, primary_branch, primary_department, ticket_prefix, setup_completed_at, created_at_utc
+FROM tenants
+WHERE tenant_id = $1
+`
+	var out Tenant
+	var setup sql.NullTime
+	err := p.db.QueryRowContext(ctx, query, tenantID).
+		Scan(&out.TenantID, &out.CompanyName, &out.AdminEmail, &out.Plan, &out.Status, &out.Timezone, &out.PrimaryBranch, &out.PrimaryDepartment, &out.TicketPrefix, &setup, &out.CreatedAtUTC)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return Tenant{}, fmt.Errorf("tenant not found")
+		}
+		return Tenant{}, err
+	}
+	if setup.Valid {
+		ts := setup.Time
+		out.SetupCompletedAt = &ts
+	}
+	return out, nil
+}
+
 func (p *PostgresStore) UpdateTenantSetup(ctx context.Context, tenantID string, in TenantSetupInput) (Tenant, error) {
 	query := `
 UPDATE tenants

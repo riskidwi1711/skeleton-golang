@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'itms_token'
 const USER_KEY = 'itms_user'
+const TENANT_SETUP_KEY = 'itms_tenant_setup_completed'
 
 function parseJwt(token) {
   if (!token || token.split('.').length < 2) return null
@@ -30,9 +31,11 @@ export function setSession({ token, user }) {
     email: user?.email || claims.email || '',
     role: user?.role || claims.role || 'viewer',
     permissions: user?.permissions || claims.permissions || [],
-    tenant_id: claims.tenant_id || 'tnt_demo',
+    tenant_id: user?.tenant_id || claims.tenant_id || 'tnt_demo',
   }
   localStorage.setItem(USER_KEY, JSON.stringify(sessionUser))
+  const completed = Boolean(user?.setup_completed_at)
+  localStorage.setItem(TENANT_SETUP_KEY, completed ? '1' : '0')
 }
 
 export function getUser() {
@@ -61,9 +64,18 @@ export function hasPermission(permission) {
   return (user.permissions || []).includes(permission)
 }
 
+export function getTenantSetupCompleted() {
+  return localStorage.getItem(TENANT_SETUP_KEY) === '1'
+}
+
+export function setTenantSetupCompleted(v) {
+  localStorage.setItem(TENANT_SETUP_KEY, v ? '1' : '0')
+}
+
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(TENANT_SETUP_KEY)
 }
 
 export function isAuthed() {

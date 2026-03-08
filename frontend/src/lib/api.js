@@ -42,6 +42,13 @@ export async function listTenants(token) {
   return data?.data?.items || []
 }
 
+export async function getTenantById(tenantId) {
+  const res = await fetch(`${API_BASE}/api/v1/tenants/${tenantId}`, { headers: { ...authHeaders() } })
+  if (!res.ok) throw new Error('Fetch tenant failed')
+  const data = await res.json()
+  return data?.data?.tenant
+}
+
 export async function onboardTenant(payload) {
   const res = await fetch(`${API_BASE}/api/v1/tenants/onboard`, {
     method: 'POST',

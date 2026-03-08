@@ -31,6 +31,17 @@ func (m *MemoryStore) ListTenant(_ context.Context) ([]Tenant, error) {
 	return out, nil
 }
 
+func (m *MemoryStore) GetTenantByID(_ context.Context, tenantID string) (Tenant, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, t := range m.tenants {
+		if t.TenantID == tenantID {
+			return t, nil
+		}
+	}
+	return Tenant{}, fmt.Errorf("tenant not found")
+}
+
 func (m *MemoryStore) UpdateTenantSetup(_ context.Context, tenantID string, in TenantSetupInput) (Tenant, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
