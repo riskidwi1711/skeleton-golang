@@ -22,7 +22,7 @@ async function submit() {
   try {
     const result = await registerTenant(form.value)
     setSession(result)
-    router.push('/dashboard')
+    router.push('/setup')
   } catch (e) {
     error.value = e.message || 'Registration failed'
   } finally {

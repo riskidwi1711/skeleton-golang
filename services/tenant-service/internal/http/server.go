@@ -18,6 +18,14 @@ type onboardRequest struct {
 	Plan        string `json:"plan"`
 }
 
+type setupRequest struct {
+	CompanyName       string `json:"company_name"`
+	Timezone          string `json:"timezone"`
+	PrimaryBranch     string `json:"primary_branch"`
+	PrimaryDepartment string `json:"primary_department"`
+	TicketPrefix      string `json:"ticket_prefix"`
+}
+
 type Server struct {
 	store     store.Store
 	publisher events.Publisher
@@ -29,6 +37,7 @@ func NewServer(st store.Store, pub events.Publisher) http.Handler {
 	mux.HandleFunc("/health", s.health)
 	mux.HandleFunc("/api/v1/tenants/onboard", s.onboard)
 	mux.HandleFunc("/api/v1/tenants", s.list)
+	mux.HandleFunc("/api/v1/tenants/", s.tenantRoutes)
 	return withRequestID(mux)
 }
 
@@ -61,6 +70,7 @@ func (s *Server) onboard(w http.ResponseWriter, r *http.Request) {
 		CompanyName:  strings.TrimSpace(req.CompanyName),
 		AdminEmail:   strings.TrimSpace(req.AdminEmail),
 		Plan:         strings.TrimSpace(req.Plan),
+		Status:       "trialing",
 		CreatedAtUTC: time.Now().UTC(),
 	}
 
@@ -96,6 +106,68 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 			"items": items,
 		},
 	})
+}
+
+func (s *Server) tenantRoutes(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasSuffix(r.URL.Path, "/setup") {
+		writeError(w, http.StatusNotFound, "not_found", "endpoint not found")
+		return
+	}
+	if r.Method != http.MethodPut && r.Method != http.MethodPatch {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+		return
+	}
+
+	trimmed := strings.TrimPrefix(r.URL.Path, "/api/v1/tenants/")
+	tenantID := strings.TrimSuffix(trimmed, "/setup")
+	tenantID = strings.Trim(tenantID, "/")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "validation_error", "tenant id required")
+		return
+	}
+
+	headerTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if headerTenant != "" && headerTenant != tenantID {
+		writeError(w, http.StatusForbidden, "forbidden", "cross-tenant setup not allowed")
+		return
+	}
+	role := strings.ToLower(strings.TrimSpace(r.Header.Get("X-User-Role")))
+	if role != "owner" && role != "admin" {
+		writeError(w, http.StatusForbidden, "forbidden", "only owner/admin can complete setup")
+		return
+	}
+
+	var req setupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if strings.TrimSpace(req.CompanyName) == "" || strings.TrimSpace(req.Timezone) == "" || strings.TrimSpace(req.PrimaryBranch) == "" || strings.TrimSpace(req.PrimaryDepartment) == "" {
+		writeError(w, http.StatusBadRequest, "validation_error", "company_name, timezone, primary_branch, primary_department are required")
+		return
+	}
+	if strings.TrimSpace(req.TicketPrefix) == "" {
+		req.TicketPrefix = "INC"
+	}
+
+	updated, err := s.store.UpdateTenantSetup(r.Context(), tenantID, store.TenantSetupInput{
+		CompanyName:       strings.TrimSpace(req.CompanyName),
+		Timezone:          strings.TrimSpace(req.Timezone),
+		PrimaryBranch:     strings.TrimSpace(req.PrimaryBranch),
+		PrimaryDepartment: strings.TrimSpace(req.PrimaryDepartment),
+		TicketPrefix:      strings.ToUpper(strings.TrimSpace(req.TicketPrefix)),
+	})
+	if err != nil {
+		if err.Error() == "tenant not found" {
+			writeError(w, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "update_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"tenant": updated}})
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

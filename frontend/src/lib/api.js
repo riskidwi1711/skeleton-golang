@@ -72,6 +72,20 @@ export async function registerTenant(payload) {
   return res.json()
 }
 
+export async function completeTenantSetup(tenantId, payload) {
+  const res = await fetch(`${API_BASE}/api/v1/tenants/${tenantId}/setup`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.error?.message || 'Tenant setup failed')
+  }
+  const data = await res.json()
+  return data?.data?.tenant
+}
+
 export async function listRoles() {
   const res = await fetch(`${API_BASE}/api/v1/roles`, { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error('Fetch roles failed')

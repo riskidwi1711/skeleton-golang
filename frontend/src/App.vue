@@ -6,7 +6,7 @@ import { refreshSession } from './lib/api'
 
 const route = useRoute()
 const router = useRouter()
-const isAuthPage = computed(() => ['/login', '/signup'].includes(route.path))
+const isAuthPage = computed(() => ['/login', '/signup', '/setup'].includes(route.path))
 const me = computed(() => getUser() || { name: 'User', role: 'viewer', tenant_id: 'tnt_demo' })
 
 const userMenuOpen = ref(false)

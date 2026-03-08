@@ -56,9 +56,10 @@ func NewServer(cfg Config) http.Handler {
 		tenantProxy.ServeHTTP(w, r)
 	}))))
 
-	mux.HandleFunc("/api/v1/tenants/", withRequestID(jwtGuard(requirePermission("tenants:read")(func(w http.ResponseWriter, r *http.Request) {
-		tenantProxy.ServeHTTP(w, r)
-	}))))
+	mux.HandleFunc("/api/v1/tenants/", withRequestID(jwtGuard(permissionByMethod(
+		func(w http.ResponseWriter, r *http.Request) { tenantProxy.ServeHTTP(w, r) },
+		map[string][]string{http.MethodGet: []string{"tenants:read"}, http.MethodPut: []string{"users:write"}, http.MethodPatch: []string{"users:write"}},
+	))))
 
 	mux.HandleFunc("/api/v1/tickets", withRequestID(jwtGuard(permissionByMethod(
 		func(w http.ResponseWriter, r *http.Request) { ticketProxy.ServeHTTP(w, r) },
