@@ -23,7 +23,7 @@ npm run preview
 
 ## API target
 Default API base:
-- `/api` (same-origin proxy from `itms.riski-labs.site` to gateway)
+- `` (empty, calls same-origin `/api/v1/...`)
 
 Override via `.env`:
 ```bash
