@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Config struct {
@@ -42,6 +43,11 @@ type updateUserRoleRequest struct {
 	Role string `json:"role"`
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 type tenantResponse struct {
 	Data struct {
 		Tenant struct {
@@ -54,13 +60,13 @@ type tenantResponse struct {
 }
 
 type appUser struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Email    string    `json:"email"`
-	Role     string    `json:"role"`
-	TenantID string    `json:"tenant_id"`
-	Password string    `json:"-"`
-	Created  time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Email        string    `json:"email"`
+	Role         string    `json:"role"`
+	TenantID     string    `json:"tenant_id"`
+	PasswordHash string    `json:"-"`
+	Created      time.Time `json:"created_at"`
 }
 
 type roleDefinition struct {
@@ -91,13 +97,14 @@ type userStore struct {
 
 func newUserStore() *userStore {
 	now := time.Now()
-	seed := "demo12345"
+	// Hash the default demo password
+	demoHash, _ := bcrypt.GenerateFromPassword([]byte("demo12345"), bcrypt.DefaultCost)
 	return &userStore{items: map[string]map[string]appUser{
 		"tnt_demo": {
-			"owner@acme.com":  {ID: "u-1", Name: "Owner Demo", Email: "owner@acme.com", Role: "owner", TenantID: "tnt_demo", Password: seed, Created: now},
-			"admin@acme.com":  {ID: "u-2", Name: "Admin Demo", Email: "admin@acme.com", Role: "admin", TenantID: "tnt_demo", Password: seed, Created: now},
-			"agent@acme.com":  {ID: "u-3", Name: "Agent Demo", Email: "agent@acme.com", Role: "agent", TenantID: "tnt_demo", Password: seed, Created: now},
-			"viewer@acme.com": {ID: "u-4", Name: "Viewer Demo", Email: "viewer@acme.com", Role: "viewer", TenantID: "tnt_demo", Password: seed, Created: now},
+			"owner@acme.com":  {ID: "u-1", Name: "Owner Demo", Email: "owner@acme.com", Role: "owner", TenantID: "tnt_demo", PasswordHash: string(demoHash), Created: now},
+			"admin@acme.com":  {ID: "u-2", Name: "Admin Demo", Email: "admin@acme.com", Role: "admin", TenantID: "tnt_demo", PasswordHash: string(demoHash), Created: now},
+			"agent@acme.com":  {ID: "u-3", Name: "Agent Demo", Email: "agent@acme.com", Role: "agent", TenantID: "tnt_demo", PasswordHash: string(demoHash), Created: now},
+			"viewer@acme.com": {ID: "u-4", Name: "Viewer Demo", Email: "viewer@acme.com", Role: "viewer", TenantID: "tnt_demo", PasswordHash: string(demoHash), Created: now},
 		},
 	}}
 }
@@ -115,7 +122,7 @@ func (s *userStore) listUsers(tenantID string) []appUser {
 	defer s.mu.RUnlock()
 	users := make([]appUser, 0, len(s.items[tenantID]))
 	for _, u := range s.items[tenantID] {
-		u.Password = ""
+		u.PasswordHash = ""
 		users = append(users, u)
 	}
 	sort.Slice(users, func(i, j int) bool { return users[i].Created.After(users[j].Created) })
@@ -136,9 +143,19 @@ func (s *userStore) createUser(tenantID, actorRole string, req createUserRequest
 	if req.Password == "" {
 		req.Password = "welcome123"
 	}
+	if len(req.Password) < 6 {
+		return appUser{}, fmt.Errorf("password must be at least 6 characters")
+	}
 	if _, ok := rolePermissions[req.Role]; !ok {
 		return appUser{}, fmt.Errorf("invalid role")
 	}
+
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return appUser{}, fmt.Errorf("failed to hash password")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.items[tenantID] == nil {
@@ -147,9 +164,9 @@ func (s *userStore) createUser(tenantID, actorRole string, req createUserRequest
 	if _, exists := s.items[tenantID][req.Email]; exists {
 		return appUser{}, fmt.Errorf("email already exists")
 	}
-	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: req.Name, Email: req.Email, Role: req.Role, TenantID: tenantID, Password: req.Password, Created: time.Now()}
+	u := appUser{ID: fmt.Sprintf("u-%d", len(s.items[tenantID])+1), Name: req.Name, Email: req.Email, Role: req.Role, TenantID: tenantID, PasswordHash: string(hashedPassword), Created: time.Now()}
 	s.items[tenantID][req.Email] = u
-	u.Password = ""
+	u.PasswordHash = ""
 	return u, nil
 }
 
@@ -176,11 +193,36 @@ func (s *userStore) updateRole(tenantID, actorRole, userID, role string) (appUse
 		if u.ID == userID {
 			u.Role = role
 			s.items[tenantID][email] = u
-			u.Password = ""
+			u.PasswordHash = ""
 			return u, nil
 		}
 	}
 	return appUser{}, fmt.Errorf("user not found")
+}
+
+func (s *userStore) changePassword(tenantID, email, currentPassword, newPassword string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	u, exists := s.items[tenantID][email]
+	if !exists {
+		return fmt.Errorf("user not found")
+	}
+
+	// Verify current password
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(currentPassword)); err != nil {
+		return fmt.Errorf("invalid current password")
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password")
+	}
+
+	u.PasswordHash = string(hashedPassword)
+	s.items[tenantID][email] = u
+	return nil
 }
 
 func NewServer(cfg Config) http.Handler {
@@ -209,7 +251,12 @@ func NewServer(cfg Config) http.Handler {
 			return
 		}
 		u, ok := users.findByEmail("tnt_demo", req.Email)
-		if !ok || u.Password != req.Password {
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+			return
+		}
+		// Compare password with bcrypt
+		if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 			return
 		}
@@ -251,6 +298,46 @@ func NewServer(cfg Config) http.Handler {
 		})
 	})
 
+	mux.HandleFunc("/api/v1/auth/change-password", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+			return
+		}
+		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		email := strings.TrimSpace(strings.ToLower(r.Header.Get("X-User-Email")))
+		if tenantID == "" || email == "" {
+			writeError(w, http.StatusUnauthorized, "missing_identity", "missing user identity")
+			return
+		}
+
+		var req changePasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+			return
+		}
+
+		if req.CurrentPassword == "" || req.NewPassword == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "current_password and new_password are required")
+			return
+		}
+
+		if len(req.NewPassword) < 6 {
+			writeError(w, http.StatusBadRequest, "validation_error", "new password must be at least 6 characters")
+			return
+		}
+
+		if err := users.changePassword(tenantID, email, req.CurrentPassword, req.NewPassword); err != nil {
+			if err.Error() == "invalid current password" {
+				writeError(w, http.StatusUnauthorized, "invalid_password", err.Error())
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "change_failed", err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"message": "password changed successfully"})
+	})
+
 	mux.HandleFunc("/api/v1/auth/register-tenant", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
@@ -268,6 +355,10 @@ func NewServer(cfg Config) http.Handler {
 		req.Plan = strings.TrimSpace(req.Plan)
 		if req.CompanyName == "" || req.FullName == "" || req.Email == "" || req.Password == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "company_name, full_name, email, password are required")
+			return
+		}
+		if len(req.Password) < 6 {
+			writeError(w, http.StatusBadRequest, "validation_error", "password must be at least 6 characters")
 			return
 		}
 		if req.Plan == "" {
@@ -295,7 +386,15 @@ func NewServer(cfg Config) http.Handler {
 		if tenantID == "" {
 			tenantID = "tnt_demo"
 		}
-		u := appUser{ID: "u-owner", Name: req.FullName, Email: req.Email, Role: "owner", TenantID: tenantID, Password: req.Password, Created: time.Now()}
+
+		// Hash the password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "password_hash_failed", "failed to hash password")
+			return
+		}
+
+		u := appUser{ID: "u-owner", Name: req.FullName, Email: req.Email, Role: "owner", TenantID: tenantID, PasswordHash: string(hashedPassword), Created: time.Now()}
 		users.upsertUser(u)
 		token, err := signToken(cfg.JWTSecret, u)
 		if err != nil {
