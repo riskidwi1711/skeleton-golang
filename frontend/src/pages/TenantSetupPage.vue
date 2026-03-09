@@ -16,17 +16,31 @@ const form = ref({
 })
 
 const loading = ref(false)
-const error = ref('')
+const toast = ref({ show: false, type: 'error', message: '' })
+let toastTimer = null
+
+function showToast(message, type = 'error') {
+  toast.value = { show: true, type, message }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.value.show = false
+  }, 3500)
+}
 
 async function submit() {
   loading.value = true
-  error.value = ''
   try {
     await completeTenantSetup(me.tenant_id, form.value)
     setTenantSetupCompleted(true)
-    router.push('/dashboard')
+    showToast('Tenant setup completed. Redirecting...', 'success')
+    setTimeout(() => router.push('/dashboard'), 500)
   } catch (e) {
-    error.value = e.message || 'Setup failed'
+    const msg = e.message || 'Setup failed'
+    if (msg.toLowerCase().includes('tenant not found')) {
+      showToast('Tenant tidak ditemukan. Silakan signup ulang atau login ulang.', 'error')
+    } else {
+      showToast(msg, 'error')
+    }
   } finally {
     loading.value = false
   }
@@ -35,6 +49,10 @@ async function submit() {
 
 <template>
   <div class="login-shell">
+    <div v-if="toast.show" class="toast" :class="toast.type === 'success' ? 'ok' : 'err'">
+      {{ toast.message }}
+    </div>
+
     <div class="login-card" style="max-width: 760px;">
       <div class="login-head">
         <div class="brand-icon">IT</div>
@@ -76,8 +94,29 @@ async function submit() {
         </label>
 
         <button class="btn" :disabled="loading">{{ loading ? 'Saving setup...' : 'Complete Setup' }}</button>
-        <p v-if="error" class="danger-text">{{ error }}</p>
       </form>
     </div>
   </div>
 </template>
+
+<style scoped>
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.toast.err {
+  background: #d13438;
+}
+
+.toast.ok {
+  background: #107c10;
+}
+</style>
