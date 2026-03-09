@@ -5,6 +5,7 @@ import AssetsPage from './pages/AssetsPage.vue'
 import AccessPage from './pages/AccessPage.vue'
 import TenantSetupPage from './pages/TenantSetupPage.vue'
 import SetupPendingPage from './pages/SetupPendingPage.vue'
+import SecurityPage from './pages/SecurityPage.vue'
 import LoginPage from './pages/LoginPage.vue'
 import SignupPage from './pages/SignupPage.vue'
 import { getTenantSetupCompleted, getUser, hasPermission, isAuthed, setTenantSetupCompleted } from './lib/auth'
@@ -20,6 +21,7 @@ const routes = [
   { path: '/access', component: AccessPage, meta: { title: 'Users & Access', permission: 'users:read', requireSetup: true } },
   { path: '/setup', component: TenantSetupPage, meta: { title: 'Tenant Setup' } },
   { path: '/setup-pending', component: SetupPendingPage, meta: { title: 'Setup Pending' } },
+  { path: '/security', component: SecurityPage, meta: { title: 'Security', requireSetup: true } },
 ]
 
 const router = createRouter({
@@ -35,7 +37,7 @@ router.beforeEach(async (to) => {
 
   const me = getUser()
   const isOwnerOrAdmin = hasPermission('users:write')
-  
+
   if (me?.tenant_id && to.meta.requireSetup) {
     let completed = getTenantSetupCompleted()
     if (!completed) {
@@ -44,24 +46,20 @@ router.beforeEach(async (to) => {
         completed = Boolean(tenant?.setup_completed_at)
         setTenantSetupCompleted(completed)
       } catch {
-        // if tenant lookup fails, assume not completed
         completed = false
       }
     }
 
     if (!completed) {
-      // Owners/admins go to setup page, others go to pending page
       return isOwnerOrAdmin ? '/setup' : '/setup-pending'
     }
   }
 
-  // Prevent going back to setup pages if already completed
   if (me?.tenant_id) {
     const completed = getTenantSetupCompleted()
     if (completed && (to.path === '/setup' || to.path === '/setup-pending')) {
       return '/dashboard'
     }
-    // Allow owners/admins to access setup page if not completed
     if (!completed && to.path === '/setup' && !isOwnerOrAdmin) {
       return '/setup-pending'
     }

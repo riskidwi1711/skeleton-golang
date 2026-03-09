@@ -30,6 +30,19 @@ export async function refreshSession() {
   return res.json()
 }
 
+export async function changePassword(current_password, new_password) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ current_password, new_password }),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.error?.message || 'Change password failed')
+  }
+  return res.json()
+}
+
 export async function listTenants(token) {
   const res = await fetch(`${API_BASE}/api/v1/tenants`, {
     headers: {

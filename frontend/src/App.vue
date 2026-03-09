@@ -73,6 +73,11 @@ function onDocClick(e) {
   if (!insideUser && !insideNotif) closeMenus()
 }
 
+function goSecurity() {
+  closeMenus()
+  router.push('/security')
+}
+
 function logout() {
   clearToken()
   closeMenus()
@@ -182,6 +187,10 @@ onBeforeUnmount(() => {
             </button>
 
             <div class="user-dropdown" v-if="userMenuOpen">
+              <button class="dropdown-item" @click="goSecurity">
+                <svg viewBox="0 0 24 24" class="icon-svg"><path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4zm0 5a3 3 0 100 6 3 3 0 000-6z"/></svg>
+                Security
+              </button>
               <button class="dropdown-item" @click="logout">
                 <svg viewBox="0 0 24 24" class="icon-svg"><path d="M10 17l-5-5 5-5M5 12h14M14 7v-2h5v14h-5v-2"/></svg>
                 Logout
