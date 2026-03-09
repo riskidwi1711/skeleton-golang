@@ -64,9 +64,7 @@ VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING tenant_id, company_name, admin_email, plan, status, timezone, primary_branch, primary_department, ticket_prefix, setup_completed_at, created_at_utc
 `
 
-	var out Tenant
-	var setup sql.NullTime
-	err := p.db.QueryRowContext(
+	row := p.db.QueryRowContext(
 		ctx,
 		query,
 		tenant.TenantID,
@@ -75,15 +73,8 @@ RETURNING tenant_id, company_name, admin_email, plan, status, timezone, primary_
 		tenant.Plan,
 		tenant.Status,
 		tenant.CreatedAtUTC,
-	).Scan(&out.TenantID, &out.CompanyName, &out.AdminEmail, &out.Plan, &out.Status, &out.Timezone, &out.PrimaryBranch, &out.PrimaryDepartment, &out.TicketPrefix, &setup, &out.CreatedAtUTC)
-	if err != nil {
-		return Tenant{}, err
-	}
-	if setup.Valid {
-		t := setup.Time
-		out.SetupCompletedAt = &t
-	}
-	return out, nil
+	)
+	return scanTenantRow(row)
 }
 
 func (p *PostgresStore) ListTenant(ctx context.Context) ([]Tenant, error) {
@@ -99,14 +90,9 @@ ORDER BY created_at_utc DESC
 
 	items := make([]Tenant, 0)
 	for rows.Next() {
-		var t Tenant
-		var setup sql.NullTime
-		if err := rows.Scan(&t.TenantID, &t.CompanyName, &t.AdminEmail, &t.Plan, &t.Status, &t.Timezone, &t.PrimaryBranch, &t.PrimaryDepartment, &t.TicketPrefix, &setup, &t.CreatedAtUTC); err != nil {
+		t, err := scanTenantRows(rows)
+		if err != nil {
 			return nil, err
-		}
-		if setup.Valid {
-			ts := setup.Time
-			t.SetupCompletedAt = &ts
 		}
 		items = append(items, t)
 	}
@@ -119,19 +105,12 @@ SELECT tenant_id, company_name, admin_email, plan, status, timezone, primary_bra
 FROM tenants
 WHERE tenant_id = $1
 `
-	var out Tenant
-	var setup sql.NullTime
-	err := p.db.QueryRowContext(ctx, query, tenantID).
-		Scan(&out.TenantID, &out.CompanyName, &out.AdminEmail, &out.Plan, &out.Status, &out.Timezone, &out.PrimaryBranch, &out.PrimaryDepartment, &out.TicketPrefix, &setup, &out.CreatedAtUTC)
+	out, err := scanTenantRow(p.db.QueryRowContext(ctx, query, tenantID))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Tenant{}, fmt.Errorf("tenant not found")
 		}
 		return Tenant{}, err
-	}
-	if setup.Valid {
-		ts := setup.Time
-		out.SetupCompletedAt = &ts
 	}
 	return out, nil
 }
@@ -149,19 +128,59 @@ SET company_name = $1,
 WHERE tenant_id = $6
 RETURNING tenant_id, company_name, admin_email, plan, status, timezone, primary_branch, primary_department, ticket_prefix, setup_completed_at, created_at_utc
 `
-	var out Tenant
-	var setup sql.NullTime
-	err := p.db.QueryRowContext(ctx, query, in.CompanyName, in.Timezone, in.PrimaryBranch, in.PrimaryDepartment, in.TicketPrefix, tenantID).
-		Scan(&out.TenantID, &out.CompanyName, &out.AdminEmail, &out.Plan, &out.Status, &out.Timezone, &out.PrimaryBranch, &out.PrimaryDepartment, &out.TicketPrefix, &setup, &out.CreatedAtUTC)
+	out, err := scanTenantRow(p.db.QueryRowContext(ctx, query, in.CompanyName, in.Timezone, in.PrimaryBranch, in.PrimaryDepartment, in.TicketPrefix, tenantID))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Tenant{}, fmt.Errorf("tenant not found")
 		}
 		return Tenant{}, err
 	}
+	return out, nil
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanTenantRow(r rowScanner) (Tenant, error) {
+	var out Tenant
+	var setup sql.NullTime
+	var timezone, primaryBranch, primaryDepartment, ticketPrefix sql.NullString
+	err := r.Scan(
+		&out.TenantID,
+		&out.CompanyName,
+		&out.AdminEmail,
+		&out.Plan,
+		&out.Status,
+		&timezone,
+		&primaryBranch,
+		&primaryDepartment,
+		&ticketPrefix,
+		&setup,
+		&out.CreatedAtUTC,
+	)
+	if err != nil {
+		return Tenant{}, err
+	}
+	if timezone.Valid {
+		out.Timezone = timezone.String
+	}
+	if primaryBranch.Valid {
+		out.PrimaryBranch = primaryBranch.String
+	}
+	if primaryDepartment.Valid {
+		out.PrimaryDepartment = primaryDepartment.String
+	}
+	if ticketPrefix.Valid {
+		out.TicketPrefix = ticketPrefix.String
+	}
 	if setup.Valid {
-		ts := setup.Time
-		out.SetupCompletedAt = &ts
+		t := setup.Time
+		out.SetupCompletedAt = &t
 	}
 	return out, nil
+}
+
+func scanTenantRows(rows *sql.Rows) (Tenant, error) {
+	return scanTenantRow(rows)
 }
